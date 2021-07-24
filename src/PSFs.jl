@@ -228,7 +228,7 @@ pp = PSFParams(500.0,1.4,1.52)
 p = psf((128,128,128),pp; sampling=(50,50,100)); #; 
 """
 function psf(sz::NTuple, pp::PSFParams; sampling=nothing)
-    amp = apsf(sz, pp, sampling=sampling)
+    amp, sampling = apsf(sz, pp, sampling=sampling)
     if isnothing(sampling)
         sum(upsample2_abs2(amp),dims=4)
     else
