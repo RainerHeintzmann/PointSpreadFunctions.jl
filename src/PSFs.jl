@@ -185,6 +185,10 @@ function field_xyz(sz, pp, sampling)
     field_xy_to_xyz(field_pupil(sz, pp, sampling), pp, sampling)
 end
 
+"""
+    pupil_xyz(sz, pp, sampling=nothing)
+    creates a pupil with electric field distributions in XYZ.
+"""
 function pupil_xyz(sz, pp, sampling=nothing)
     if isnothing(sampling)
         sampling = get_sampling(sz, pp)
@@ -219,6 +223,10 @@ function apsf(sz::NTuple, pp::PSFParams; sampling=nothing)
     return NDTools.select_region(res, new_size=sz[1:2]), sampling # extract the central bit, which avoids the wrap-around effects
 end
 
+"""
+    amp_to_int(field) 
+    converts a complex-valued amplitude field to intensity via `abs2.` and summing over the 4th dimension.
+"""
 amp_to_int(field) = sum(abs2.(field), dims=4)
 
 """
