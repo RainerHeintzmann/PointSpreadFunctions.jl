@@ -1,0 +1,10 @@
+name = "PSFs"
+uuid = "e8810a93-244e-46c5-8da3-35c5dd956001"
+authors = ["rheintzmann <heintzmann@gmail.com>"]
+version = "0.1.0"
+
+[deps]
+FourierTools = "b18b359b-aebc-45ac-a139-9c0ccbb2871e"
+IndexFunArrays = "613c443e-d742-454e-bfc6-1d7f8dd76566"
+NDTools = "98581153-e998-4eef-8d0d-5ec2c052313d"
+SpecialFunctions = "276daf66-3868-5448-9aa4-cd146d93841b"
