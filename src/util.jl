@@ -4,6 +4,9 @@
 """
 amp_to_int(field) = sum(abs2.(field), dims=4)
 
+function has_z_symmetry(pp::PSFParams)
+    return true; # will be changed later, when assymetric aberrations are allowed
+end
 
 function get_sampling(sz::NTuple, pp::PSFParams)
     s_xyz = (pp.λ ./ pp.n) ./ 2

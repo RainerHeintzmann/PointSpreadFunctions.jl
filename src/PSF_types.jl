@@ -7,6 +7,7 @@ struct STED <: PSFMode end
 abstract type PSFMethod end
 struct MethodSincR <: PSFMethod end
 struct MethodPropagate <: PSFMethod end
+struct MethodPropagateIterative<: PSFMethod end
 struct MethodRichardsWolf <: PSFMethod end
 struct MethodShell <: PSFMethod end
 
@@ -35,7 +36,8 @@ struct PSFParams
     method # the method of calculation (e.g. PSFs.MethodPropagate).
 end
 
-function PSFParams(my_λ=500, my_NA=1.2, my_n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, aplanatic = (θ) -> sqrt.(max.(0,cos.(θ))), method=MethodPropagate)
+function PSFParams(my_λ=500, my_NA=1.2, my_n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
+                    aplanatic = aplanatic_detection, method=MethodPropagateIterative)
     PSFParams(my_λ, my_NA, my_n, dtype, mode, pol, aplanatic, method)
 end
 
