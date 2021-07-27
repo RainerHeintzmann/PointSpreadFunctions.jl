@@ -8,22 +8,69 @@ function has_z_symmetry(pp::PSFParams)
     return true; # will be changed later, when assymetric aberrations are allowed
 end
 
-function get_sampling(sz::NTuple, pp::PSFParams)
-    s_xyz = (pp.λ ./ pp.n) ./ 2
+function get_Abbe_limit(pp)
+    d_xy = pp.λ ./ (2 .* pp.n) 
+    d_z = (1 - cos(asin(pp.NA/ pp.n))) * pp.λ / pp.n
+    pp.dtype.((d_xy,d_xy,d_z))
+end
+
+function get_required_amp_sampling(sz::NTuple, pp::PSFParams)
+    abbe = get_Abbe_limit(pp)[1:length(sz)]
     sz2 = sz .÷ 2
-    s_xyz .* (sz2.-2) ./ sz2 
+    abbe .* (sz2.-2) ./ sz2 # provide a minimum amount of oversampling to avoid problems with the border pixesl.
+end
+
+"""
+    get_Ewald_sampling(sz::NTuple, pp::PSFParams)
+    returns the required minimum sampling for the calculation of a full Ewald sphere.
+"""
+function get_Ewald_sampling(sz::NTuple, pp::PSFParams)
+    s_xyz = pp.λ ./ (2 .* pp.n) 
+    sz2 = sz .÷ 2
+    s_xyz .* (sz2.-2) ./ sz2 # provide a minimum amount of oversampling to avoid problems with the border pixesl.
+end
+
+
+"""
+    get_McCutchen_kz_center(ft_shell, pp, sampling)
+    calculates the (rounded) pixels position half way between both, the kz-borders of the McCutchen pupil to extract from the full sized Ewald sphere.
+    The pixel z position is returned together with the corresponding kz position.
+"""
+function get_McCutchen_kz_center(sz, pp, sampling)
+    k_z_scale = k_scale(sz, pp, sampling)[3]
+    dkz = k_dz(pp) ./ k_z_scale
+    pk0 = k_0(pp) ./ k_z_scale
+    old_center = sz .÷ 2 .+ 1
+    new_center = (old_center[1], old_center[2], round(eltype(old_center), old_center[3] .+ pk0 .- dkz /2))
+    # kz_center = (new_center[3] - old_center[3]) * k_z_scale
+    return new_center, new_center[3]-old_center[3]
+end
+
+"""
+    limit_k_z(ft_shell, pp, sampling)
+    limits the k_z range of the ewald-sphere.
+    returns the extracted region and the new sampling
+"""
+function limit_kz(ft_shell, pp, sampling)
+    sz = size(ft_shell)
+    get_kz_center(sz, pp, sampling)
+    dkz = k_dz(pp) ./ k_z_scale
+    new_size = (sz[1], sz[2], ceil(eltype(sz), dkz).+1) 
+    cut_shell = FourierTools.select_region_ft(ft_shell, center = new_center, new_size = new_size)
+    sampling = (sampling[1],sampling[2],sampling[2] * sz[3] / new_size[3])
+    return cut_shell, sampling 
 end
 
 function sinc_r(sz::NTuple, pp::PSFParams; sampling=nothing)
     if isnothing(sampling)
-        sampling=get_sampling(sz, pp)
+        sampling=get_Ewald_sampling(sz, pp)
     end 
     sinc.(rr(pp.dtype, sz, scale=2 .*sampling ./ (pp.λ./pp.n)))
 end
 
 function jinc_r_2d(sz::NTuple, pp::PSFParams; sampling=nothing)
     if isnothing(sampling)
-        sampling=get_sampling(sz, pp)
+        sampling=get_Ewald_sampling(sz, pp)
     end 
     jinc.(rr(pp.dtype, sz[1:2], scale=2 .*sampling[1:2] ./ (pp.λ./pp.NA)))
 end
