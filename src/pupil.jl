@@ -50,14 +50,14 @@ end
 """
 function pupil_xyz(sz, pp, sampling=nothing)
     if isnothing(sampling)
-        sampling = get_sampling(sz, pp)
+        sampling = get_Ewald_sampling(sz, pp)
     end
     field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
 end
 
 function get_propagator(sz,pp,sampling)
     if isnothing(sampling)
-        sampling = get_sampling(sz, pp)
+        sampling = get_Ewald_sampling(sz, pp)
     end
     k_max_rel = sampling[1:2] ./ (pp.λ / pp.n)
     # prop1 = propagator(pp.dtype, sz[1:2], Δz=1, k_max = k_max_rel)
