@@ -17,10 +17,14 @@ Example:
 pp = PSFParams(500.0,1.4,1.52)
 p = psf((128,128,128),pp; sampling=(50,50,100)); #; 
 """
-function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true) # unclear why the resampling seems to be so bad
+function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, return_amp=false) # unclear why the resampling seems to be so bad
     if use_resampling == false
         amp = apsf(sz, pp, sampling=sampling)
-        return amp_to_int(amp), amp
+        if return_amp
+            return amp_to_int(amp), amp
+        else
+            return amp_to_int(amp)
+        end
     end
     small_sz=ceil.(Int,sz./2)
     big_sz = small_sz .* 2
@@ -33,9 +37,17 @@ function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true) #
     amp = upsample2(amp,dims=(1,2,3))
     res = sum(abs2.(amp),dims=4)[:,:,:,1]
     if any(isodd.(sz))
-        return NDTools.select_region(res,new_size=sz), amp
+        if return_amp
+            return NDTools.select_region(res,new_size=sz), amp
+        else
+            return NDTools.select_region(res,new_size=sz)
+        end
     else
-        return res, amp
+        if return_amp
+            return res, amp
+        else
+            return res
+        end
     end
 end
 
