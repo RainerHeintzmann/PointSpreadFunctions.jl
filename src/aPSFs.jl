@@ -1,12 +1,12 @@
 
-function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing) 
+function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
     check_amp_sampling(sz, pp, sampling)
 
     if isnothing(sampling)
         sampling = get_required_amp_sampling(sz, pp) # this is knowingly too small along kz but fixed down below, if needed.
     end
     Ewald_sampling = get_Ewald_sampling(sz, pp)
-    @show undersampling_factor = sampling[3] ./ Ewald_sampling[3]
+    undersampling_factor = sampling[3] ./ Ewald_sampling[3]
     # The big_sz is used to avoid interference effects by the application of the multiplication with the pupil maks in Fourier space
     # The size if 4/3 is such that the diagonals are covered but a wrap-around into the original size is avoided.
     # big_sz = ((sz[1:2].*2)...,sz[3]+2)  # The 2 extra slices in z seem to be necessary to avoid a problem at the fist position
@@ -14,8 +14,8 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing)
 
     if undersampling_factor > 1.0 # the current sampling is insufficient for the SincR method. We need to properly sample the Ewald sphere.
         # the size sz[3] will be cut out in Fourier-spage around the cleaned and processed part of the McCutchen pupil, which should yield the sampling as currently specified.
-        @show nowrap_sz = (big_sz[1:2]..., ceil(Int, undersampling_factor .* big_sz[3]))
-        @show big_sampling = (sampling[1:2]..., sampling[3] * big_sz[3] / nowrap_sz[3]) # calculate the sampling needed to cover the Ewald sphere.
+        nowrap_sz = (big_sz[1:2]..., ceil(Int, undersampling_factor .* big_sz[3]))
+        big_sampling = (sampling[1:2]..., sampling[3] * big_sz[3] / nowrap_sz[3]) # calculate the sampling needed to cover the Ewald sphere.
     else
         nowrap_sz = big_sz
         big_sampling = sampling
@@ -25,15 +25,22 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing)
     sinc_r_big = sinc_r(nowrap_sz,pp, sampling=big_sampling) .* my_disc(nowrap_sz[1:2],pp)  # maybe this should rather already be apodized by angle?
 
     if big_sampling[3] != sampling[3] # we need to extract (to reduce the size to the user-defined) and circshift (to get the correct phases)
-        @show kzc, rel_kz = get_McCutchen_kz_center(nowrap_sz,pp,big_sampling)
-        shell = circshift(NDTools.select_region(theta_z(nowrap_sz) .* ft(sinc_r_big, (1,2,3)), new_size=(nowrap_sz[1:2]...,big_sz[3]), center = kzc), (0,0,rel_kz)) # 
+        kzc, rel_kz = get_McCutchen_kz_center(nowrap_sz,pp,big_sampling)
+        shell = NDTools.select_region(theta_z(nowrap_sz) .* ft(sinc_r_big, (1,2,3)), new_size=(nowrap_sz[1:2]...,big_sz[3]), center = kzc) # centers the Pupil along kz
+        if !center_kz
+            shell = circshift(shell, (0,0,rel_kz)) # 
+        end
     else
         shell =  theta_z(nowrap_sz) .* ft(sinc_r_big, (1,2,3))
+        if center_kz
+            kzc, rel_kz = get_McCutchen_kz_center(nowrap_sz,pp,big_sampling)
+            shell = circshift(shell, (0,0,-rel_kz)) # needed for subsequent upsampling along kz
+        end
     end
     # shell, sampling =  limit_kz(theta_z(nowrap_sz) .* ft(sinc_r_big, (1,2,3)), pp, sampling) # remove negative frequencies and limit to useful range
 
     # check_amp_sampling_sincr(nowrap_sz, pp, sampling)
-    print("Amplitude sampling is $sampling \n")
+    # print("Amplitude sampling is $sampling \n")
     pupils = (cos.(pupil_θ(nowrap_sz,pp,sampling)) .* pupil) .* iftz(shell)
     res=ift2d(pupils) # This should really be a zoomed iFFT
     return NDTools.select_region(res, new_size=sz[1:3]) # extract the central bit, which avoids the wrap-around effects
@@ -63,7 +70,8 @@ function apply_propagators(pupil, z_planes, pp::PSFParams; sampling=nothing)
     return pupils
 end
 
-function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothing) 
+
+function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
     if isnothing(sampling)
         sampling = get_Ewald_sampling(sz, pp)
         print("Sampling is $sampling \n")
@@ -73,13 +81,17 @@ function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothi
     pupils = apply_propagators(pupil, sz[3], pp, sampling=sampling)
     # return pupils
     # pupils .*= window_hanning((1,1,size(pupils,3)),border_in=0.8,border_out=1.0,dims=(3,))
+    if center_kz
+        _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling)
+        pupils .*= cispi.((-2*rel_kz/sz[3]) .* zz((1,1,sz[3]))) # centers the McCutchen pupil to be able to correctly resample it along kz
+    end
     res=ift2d(pupils) # This should really be a zoomed iFFT
     return res # extract the central bit, which avoids the wrap-around effects
 end
 
 # This function is needed for the propagate method, but iterates between real and Fourier space always smoothly deleting "out-of-bound" waves.
 # The final result is already in real space.
-function apply_propagator_iteratively(pupil, z_planes, pp::PSFParams; sampling=nothing) 
+function apply_propagator_iteratively(pupil, z_planes, pp::PSFParams; sampling=nothing, center_kz=false) 
     sz = (size(pupil)[1:2]...,z_planes,size(pupil)[4])
     # calculate the phase derivatives
     slices = Array{Complex{pp.dtype}}(undef, sz)
@@ -87,6 +99,10 @@ function apply_propagator_iteratively(pupil, z_planes, pp::PSFParams; sampling=n
     prop_kz, scalar, xy_scale = get_propagator(sz, pp, sampling)
     start_pupil = copy(pupil)
     prop_pupil = cis.(prop_kz)
+    if center_kz
+        _, rel_kz = get_McCutchen_kz_center(sz[1:3],pp,sampling)
+        prop_pupil .*= cispi(-2*rel_kz/sz[3])
+    end
     real_window = window_hanning(size(pupil)[1:2],border_in=0.9,border_out=1.0)
     prop_pupil = conj(prop_pupil) # from now the advancement is in the opposite direction
     for z in start_z:-1:2 # from the middle to the start
@@ -113,14 +129,14 @@ function apply_propagator_iteratively(pupil, z_planes, pp::PSFParams; sampling=n
     return slices
 end
 
-function apsf(::Type{MethodPropagateIterative}, sz::NTuple, pp::PSFParams; sampling=nothing) 
+function apsf(::Type{MethodPropagateIterative}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
     if isnothing(sampling)
         sampling = get_Ewald_sampling(sz, pp)
         print("Sampling is $sampling \n")
     end
     check_amp_sampling(sz, pp, sampling)
     pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
-    slices = apply_propagator_iteratively(pupil, sz[3], pp, sampling=sampling)
+    slices = apply_propagator_iteratively(pupil, sz[3], pp, sampling=sampling, center_kz=center_kz)
     return slices # extract the central bit, which avoids the wrap-around effects
 end
 
@@ -141,7 +157,7 @@ end
 
 
 # Basic idea of MethodShell: Displace each kxy by the appropriate kz 
-function apsf(::Type{MethodShell}, sz::NTuple, pp::PSFParams; sampling=nothing) 
+function apsf(::Type{MethodShell}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
     if isnothing(sampling)
         sampling = get_Ewald_sampling(sz, pp)
         print("Sampling is $sampling \n")
@@ -155,12 +171,19 @@ function apsf(::Type{MethodShell}, sz::NTuple, pp::PSFParams; sampling=nothing)
 end
 
 """
-    apsf(sz::NTuple, pp::PSFParams; sampling=nothing)
+    apsf(sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false)
+    dispatches to various amplitude point spread function calculation routines.
+Argument:
++ sz: NTuple of size to generate
++ pp: PSF parameter structure, also contains the dtype. See PSFParam() for details
++ sampling: NTuple for pixel pitch information
++ center_kz: if true, the McCutchen pupil will be centered along the kz direction. This is important to be able to apply a consecutive resampling without errors.
+             However, the phase values are then not correct, which does not matter for intensity PSFs.
 Example:
 pp = PSFParams(500.0,1.4,1.52)
 p = apsf((128,128,128),pp; sampling=(50,50,100)); #; 
 """
-function apsf(sz::NTuple, pp::PSFParams; sampling=nothing) 
-    apsf(pp.method, sz, pp, sampling=sampling)
+function apsf(sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
+    apsf(pp.method, sz, pp, sampling=sampling, center_kz=center_kz)
 end
 
