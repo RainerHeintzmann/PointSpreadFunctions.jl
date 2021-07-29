@@ -124,10 +124,10 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
     # real_window = window_gaussian(size(start_pupil)[1:2], border_in=border_in,border_out=border_in.*0.5 .+ 0.5)  # This is maybe not the best PML?
     # real_window = window_hanning(size(start_pupil)[1:2],border_in=border_in,border_out=1)
     prop_pupil = conj(prop_pupil) # from now the advancement is in the opposite direction
-    if pp.FFTPlan != nothing
+    if pp.FFTPlan !== nothing
         P2d = plan_fft(pupil,(1,2), flags=pp.FFTPlan)
     end
-    if pp.FFTPlan != nothing
+    if pp.FFTPlan !== nothing
         Pi2d = plan_ifft(pupil,(1,2), flags=pp.FFTPlan)
     end
     pupil = start_pupil

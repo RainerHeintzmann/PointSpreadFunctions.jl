@@ -26,8 +26,9 @@ function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, r
             return amp_to_int(amp)
         end
     end
-    small_sz=ceil.(Int,sz./2)
-    big_sz = small_sz .* 2
+    extra_layers = 2
+    small_sz=ceil.(Int,sz./2) .+ extra_layers
+    big_sz = small_sz .* 2  # size after upsampling
     if ~isnothing(sampling)
         amp_sampling = sampling .* big_sz ./ small_sz
     else
@@ -38,9 +39,11 @@ function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, r
         P1d = plan_fft(amp,(1,2), flags=pp.FFTPlan)
         P1id = plan_ifft(amp,(1,2), flags=pp.FFTPlan)
     end
-    amp = upsample2(amp,dims=(1,2,3))
+    border_in = (0,0,ceil.(Int,sz[3]./2) ./ small_sz[3],0)
+    mywin = collect(window_hanning((1,1,small_sz[3],1), border_in=border_in, border_out=1)) # for speed reasons the collect is faster
+    amp = upsample2(amp .* mywin,dims=(1,2,3))
     res = sum(abs2.(amp),dims=4)[:,:,:,1]
-    if any(isodd.(sz))
+    if true # any(isodd.(sz))
         if return_amp
             return NDTools.select_region(res,new_size=sz), amp
         else
