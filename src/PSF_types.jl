@@ -34,10 +34,11 @@ struct PSFParams
     polarization # a function calculating the polarization from a given Tuple of relative-k pupil vectors. Can also be pol_scalar()
     aplanatic # aplanatic factor. Provided as a function of angle θ
     method # the method of calculation (e.g. PSFs.MethodPropagate).
+    FFTPlan # if not nothing this will be the plan of how to perform FFTs
 end
 
 function PSFParams(my_λ=500, my_NA=1.2, my_n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
-                    aplanatic = aplanatic_detection, method=MethodPropagateIterative)
-    PSFParams(my_λ, my_NA, my_n, dtype, mode, pol, aplanatic, method)
+                    aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing)
+    PSFParams(my_λ, my_NA, my_n, dtype, mode, pol, aplanatic, method, FFTPlan)
 end
 

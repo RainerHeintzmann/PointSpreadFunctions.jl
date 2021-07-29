@@ -1,6 +1,6 @@
 module PSFs
 using FourierTools: center_pos, FourierJoin
-using FourierTools, NDTools, IndexFunArrays, SpecialFunctions
+using FourierTools, NDTools, IndexFunArrays, SpecialFunctions, FFTW
 export PSFParams, sinc_r, jinc_r_2d, pupil_xyz, apsf, psf, k0, kxy, aplanatic_factor
 export ModeWidefield, ModeConfocal, Mode4Pi
 
@@ -34,6 +34,10 @@ function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, r
         amp_sampling = nothing
     end
     amp = apsf(small_sz, pp, sampling=amp_sampling, center_kz=true)
+    if pp.FFTPlan != nothing
+        P1d = plan_fft(amp,(1,2), flags=pp.FFTPlan)
+        P1id = plan_ifft(amp,(1,2), flags=pp.FFTPlan)
+    end
     amp = upsample2(amp,dims=(1,2,3))
     res = sum(abs2.(amp),dims=4)[:,:,:,1]
     if any(isodd.(sz))

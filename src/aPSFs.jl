@@ -23,6 +23,9 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
 
     pupil = pupil_xyz(nowrap_sz, pp, big_sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
     sinc_r_big = sinc_r(nowrap_sz,pp, sampling=big_sampling) .* my_disc(nowrap_sz[1:2],pp)  # maybe this should rather already be apodized by angle?
+    if pp.FFTPlan != nothing
+        P3d = plan_fft(sinc_r_big, flags=pp.FFTPlan)
+    end
 
     if big_sampling[3] != sampling[3] # we need to extract (to reduce the size to the user-defined) and circshift (to get the correct phases)
         kzc, rel_kz = get_McCutchen_kz_center(nowrap_sz,pp,big_sampling)
@@ -42,6 +45,10 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
     # check_amp_sampling_sincr(nowrap_sz, pp, sampling)
     # print("Amplitude sampling is $sampling \n")
     pupils = (cos.(pupil_θ(nowrap_sz,pp,sampling)) .* pupil) .* iftz(shell)
+    if pp.FFTPlan != nothing
+        Pm2d = plan_fft(pupils,(1,2), flags=pp.FFTPlan)
+    end
+
     res=ift2d(pupils) # This should really be a zoomed iFFT
     return NDTools.select_region(res, new_size=sz[1:3]) # extract the central bit, which avoids the wrap-around effects
     # , sampling
@@ -85,33 +92,52 @@ function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothi
         _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling)
         pupils .*= cispi.((-2*rel_kz/sz[3]) .* zz((1,1,sz[3]))) # centers the McCutchen pupil to be able to correctly resample it along kz
     end
+    if pp.FFTPlan != nothing
+        Pm2d = plan_fft(pupils,(1,2), flags=pp.FFTPlan)
+    end
     res=ift2d(pupils) # This should really be a zoomed iFFT
     return res # extract the central bit, which avoids the wrap-around effects
 end
 
 # This function is needed for the propagate method, but iterates between real and Fourier space always smoothly deleting "out-of-bound" waves.
 # The final result is already in real space.
-function apply_propagator_iteratively(pupil, z_planes, pp::PSFParams; sampling=nothing, center_kz=false) 
-    sz = (size(pupil)[1:2]...,z_planes,size(pupil)[4])
+function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, center_kz=false) 
+    z_planes = sz[3]
     # calculate the phase derivatives
-    slices = Array{Complex{pp.dtype}}(undef, sz)
     start_z = z_planes÷2+1
-    prop_kz, scalar, xy_scale = get_propagator(sz, pp, sampling)
-    start_pupil = copy(pupil)
+    max_pix_travel = (tan(asin(pp.NA / pp.n)) * sampling[3]) ./ sampling[1:2] # how much does the maximal anlge travel geometrically
+    PMLsz = (ceil.(Int, max_pix_travel .* 8)...,0) # To get the number of perfectly matched layer (PML) pixels to append
+    psz = sz .+ 2 .*PMLsz # total size for propagation pupil
+    pupil = pupil_xyz(psz[1:2], pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
+    sz = (sz[1:3]...,size(pupil)[4])
+    slices = Array{Complex{pp.dtype}}(undef, sz)
+
+    prop_kz, scalar, xy_scale = get_propagator(psz, pp, sampling)
+    start_pupil = pupil # copy(pupil)
     prop_pupil = cis.(prop_kz)
     if center_kz
-        _, rel_kz = get_McCutchen_kz_center(sz[1:3],pp,sampling)
-        prop_pupil .*= cispi(-2*rel_kz/sz[3])
+        _, rel_kz = get_McCutchen_kz_center(psz[1:3],pp,sampling)
+        prop_pupil .*= cispi(-2*rel_kz/psz[3])
     end
-    real_window = window_hanning(size(pupil)[1:2],border_in=0.9,border_out=1.0)
+    border_in = 1.0 .- PMLsz[1:2] ./ psz[1:2]
+    real_window = exp.(1.75 .* (window_linear(size(start_pupil)[1:2],border_in=border_in,border_out=1) .-1))  # This is maybe not the best PML?
+    # real_window = window_gaussian(size(start_pupil)[1:2], border_in=border_in,border_out=border_in.*0.5 .+ 0.5)  # This is maybe not the best PML?
+    # real_window = window_hanning(size(start_pupil)[1:2],border_in=border_in,border_out=1)
     prop_pupil = conj(prop_pupil) # from now the advancement is in the opposite direction
+    if pp.FFTPlan != nothing
+        P2d = plan_fft(pupil,(1,2), flags=pp.FFTPlan)
+    end
+    if pp.FFTPlan != nothing
+        Pi2d = plan_ifft(pupil,(1,2), flags=pp.FFTPlan)
+    end
+    pupil = start_pupil
     for z in start_z:-1:2 # from the middle to the start
         slice = ift2d(pupil) # should be ifft2d for speed reasons
-        slices[:,:,z:z,:] .= slice
+        slices[:,:,z:z,:] .= select_region(slice,new_size=sz[1:2])
         pupil = ft2d(slice .* real_window)
         pupil .*= prop_pupil 
     end
-    slices[:,:,1:1,:] .= ift2d(pupil) 
+    slices[:,:,1:1,:] .= select_region(ift2d(pupil), new_size=sz[1:2])
     if has_z_symmetry(pp) # to save some speed
         dz = sz[3] - (start_z+1)
         slices[:,:,start_z+1:start_z+1+dz,:] .= conj(slices[:,:,start_z-1:-1:start_z-1-dz,:]);
@@ -120,11 +146,11 @@ function apply_propagator_iteratively(pupil, z_planes, pp::PSFParams; sampling=n
         pupil = start_pupil .* prop_pupil
         for z in start_z+1:sz[3]-1  # from the middle forward
             slice = ift2d(pupil)
-            slices[:,:,z:z,:] .= slice
+            slices[:,:,z:z,:] .= select_region(slice, new_size=sz[1:2])
             pupil = ft2d(slice .* real_window)
             pupil .*= prop_pupil 
         end
-        slices[:,:,sz[3]:sz[3],:] .= ift2d(pupil) 
+        slices[:,:,sz[3]:sz[3],:] .= select_region(ift2d(pupil), new_size=sz[1:2])
     end
     return slices
 end
@@ -135,8 +161,7 @@ function apsf(::Type{MethodPropagateIterative}, sz::NTuple, pp::PSFParams; sampl
         print("Sampling is $sampling \n")
     end
     check_amp_sampling(sz, pp, sampling)
-    pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
-    slices = apply_propagator_iteratively(pupil, sz[3], pp, sampling=sampling, center_kz=center_kz)
+    slices = apply_propagator_iteratively(sz, pp, sampling=sampling, center_kz=center_kz)
     return slices # extract the central bit, which avoids the wrap-around effects
 end
 
