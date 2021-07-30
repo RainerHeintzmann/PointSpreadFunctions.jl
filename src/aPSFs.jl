@@ -29,7 +29,7 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
 
     if big_sampling[3] != sampling[3] # we need to extract (to reduce the size to the user-defined) and circshift (to get the correct phases)
         kzc, rel_kz = get_McCutchen_kz_center(nowrap_sz,pp,big_sampling)
-        shell = NDTools.select_region(theta_z(nowrap_sz) .* ft(sinc_r_big, (1,2,3)), new_size=(nowrap_sz[1:2]...,big_sz[3]), center = kzc) # centers the Pupil along kz
+        shell = NDTools.select_region_copy!(theta_z(nowrap_sz) .* ft(sinc_r_big, (1,2,3)), new_size=(nowrap_sz[1:2]...,big_sz[3]), center = kzc) # centers the Pupil along kz
         if !center_kz
             shell = circshift(shell, (0,0,rel_kz)) # 
         end
@@ -50,7 +50,7 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
     end
 
     res=ift2d(pupils) # This should really be a zoomed iFFT
-    return NDTools.select_region(res, new_size=sz[1:3]) # extract the central bit, which avoids the wrap-around effects
+    return NDTools.select_region_copy!(res, new_size=sz[1:3]) # extract the central bit, which avoids the wrap-around effects
     # , sampling
 end
 
@@ -133,11 +133,11 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
     pupil = start_pupil
     for z in start_z:-1:2 # from the middle to the start
         slice = ift2d(pupil) # should be ifft2d for speed reasons
-        slices[:,:,z:z,:] .= select_region(slice,new_size=sz[1:2])
+        select_region_copy!(slice, slices[:,:,z:z,:], new_size=sz[1:2])
         pupil = ft2d(slice .* real_window)
         pupil .*= prop_pupil 
     end
-    slices[:,:,1:1,:] .= select_region(ift2d(pupil), new_size=sz[1:2])
+    select_region_copy!(ift2d(pupil), slices[:,:,1:1,:], new_size=sz[1:2])
     if has_z_symmetry(pp) # to save some speed
         dz = sz[3] - (start_z+1)
         slices[:,:,start_z+1:start_z+1+dz,:] .= conj(slices[:,:,start_z-1:-1:start_z-1-dz,:]);
@@ -146,11 +146,11 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
         pupil = start_pupil .* prop_pupil
         for z in start_z+1:sz[3]-1  # from the middle forward
             slice = ift2d(pupil)
-            slices[:,:,z:z,:] .= select_region(slice, new_size=sz[1:2])
+            select_region_copy!(slice, slices[:,:,z:z,:], new_size=sz[1:2])
             pupil = ft2d(slice .* real_window)
             pupil .*= prop_pupil 
         end
-        slices[:,:,sz[3]:sz[3],:] .= select_region(ift2d(pupil), new_size=sz[1:2])
+        select_region_copy!(ift2d(pupil), slices[:,:,sz[3]:sz[3],:], new_size=sz[1:2])
     end
     return slices
 end
