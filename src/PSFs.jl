@@ -45,9 +45,9 @@ function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, r
     res = sum(abs2.(amp),dims=4)[:,:,:,1]
     if true # any(isodd.(sz))
         if return_amp
-            return NDTools.select_region(res,new_size=sz), amp
+            return select_region!(res,new_size=sz), amp
         else
-            return NDTools.select_region(res,new_size=sz)
+            return select_region!(res,new_size=sz)
         end
     else
         if return_amp
