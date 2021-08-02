@@ -29,7 +29,7 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
 
     if big_sampling[3] != sampling[3] # we need to extract (to reduce the size to the user-defined) and circshift (to get the correct phases)
         kzc, rel_kz = get_McCutchen_kz_center(nowrap_sz,pp,big_sampling)
-        shell = NDTools.select_region!(theta_z(nowrap_sz) .* ft(sinc_r_big, (1,2,3)), new_size=(nowrap_sz[1:2]...,big_sz[3]), center = kzc) # centers the Pupil along kz
+        shell = select_region!(theta_z(nowrap_sz) .* ft(sinc_r_big, (1,2,3)), new_size=(nowrap_sz[1:2]...,big_sz[3]), center = kzc) # centers the Pupil along kz
         if !center_kz
             shell = circshift(shell, (0,0,rel_kz)) # 
         end
@@ -50,7 +50,7 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
     end
 
     res=ift2d(pupils) # This should really be a zoomed iFFT
-    return NDTools.select_region!(res, new_size=sz[1:3]) # extract the central bit, which avoids the wrap-around effects
+    return select_region!(res, new_size=sz[1:3]) # extract the central bit, which avoids the wrap-around effects
     # , sampling
 end
 

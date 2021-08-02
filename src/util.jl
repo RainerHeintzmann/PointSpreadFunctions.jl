@@ -86,7 +86,7 @@ theta_z(sz) = (zz(sz) .> 0) # The direction is important due to the highest freq
 
 """
     k_0(pp::PSFParams)
-    k in the medium as n/lambda
+    k in the medium as n/lambda.   (1/space units
 """ 
 function k_0(pp::PSFParams)
     pp.dtype(pp.n / pp.λ)
@@ -94,7 +94,7 @@ end
 
 """
     k_pupil(pp::PSFParams)
-    maxim radial k-coordinate where the pupil ends
+    maxim radial k-coordinate (1/space units) where the pupil ends
 + `pp`:  PSF parameter structure
 """
 function k_pupil(pp::PSFParams)
@@ -114,15 +114,38 @@ end
     k_scale(sz,sampling)
     pixelpitch (as NTuple) in k-space
 + `sz`:  size of the real-space array
++ `pp`:  PSF parameter structure
 + `sampling`: pixelpitch in real space as NTuple
 """
-function k_scale(sz, pp, sampling)
+function k_scale(sz, pp::PSFParams, sampling)
     pp.dtype.(1 ./ (sz .* sampling))
 end
 
 """
+    k_pupil_pos(sz, pp::PSFParams, sampling)
+    returns the X and Y position of the pupil border in reciprocal space pixels.
++ `sz`:  size of the real-space array
++ `pp`:  PSF parameter structure
++ `sampling`: pixelpitch in real space as NTuple
+"""
+function k_pupil_pos(sz, pp::PSFParams, sampling)
+    k_pupil(pp) ./ k_scale(sz, pp, sampling)
+end
+
+"""
+    k_0_pos(sz, pp::PSFParams, sampling)
+    returns the X and Y position of the Ewald-sphere border in reciprocal space pixels.
++ `sz`:  size of the real-space array
++ `pp`:  PSF parameter structure
++ `sampling`: pixelpitch in real space as NTuple
+"""
+function k_0_pos(sz, pp::PSFParams, sampling)
+    k_0(pp) ./ k_scale(sz, pp, sampling)
+end
+
+"""
     k_r(sz, pp::PSFParams, sampling)
-    the radial k, |k_xy|
+    returns an array of radial k coordinates, |k_xy|
 """
 function k_r(sz, pp::PSFParams, sampling)
     min.(k_0(pp), rr(pp.dtype, sz[1:2],scale = k_scale(sz[1:2], pp, sampling[1:2])))
@@ -136,6 +159,10 @@ function k_xy(sz,pp,sampling)
     idx(pp.dtype, sz[1:2],scale = k_scale(sz[1:2], pp, sampling[1:2]))
 end
 
+"""
+    k_xy_rel_pupil(sz,pp,sampling)
+    returns an array of relative distance to the pupil border
+"""
 function k_xy_rel_pupil(sz,pp,sampling)
     idx(pp.dtype, sz[1:2],scale = k_scale(sz[1:2], pp, sampling[1:2]) ./ k_pupil(pp))
 end

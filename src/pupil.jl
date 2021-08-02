@@ -52,7 +52,11 @@ function pupil_xyz(sz, pp, sampling=nothing)
     if isnothing(sampling)
         sampling = get_Ewald_sampling(sz, pp)
     end
-    field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
+    if isnothing(pp.aberrations) || isempty(pp.aberrations.indices)
+        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
+    else
+        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling) .* get_zernike_pupil(sz, pp, sampling) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
+    end
 end
 
 function get_propagator(sz,pp,sampling)
@@ -79,3 +83,45 @@ function get_propagator_gradient(prop_phase, scalar, xy_scale)
     return dx_prop_phase, dy_prop_phase
 end
 
+"""
+    get_zernike_pupil_phase(sz, pp, sampling, J::Vector{Int}, coefficients::Vector; index=:OSA) 
+    calculates the phases in the pupil for a given set of aberrations as defined by `J` and `coefficients`.
+    By default this follows the OSA nomenclature. See the help file of `ZernikePolynomials.jl` for more information.
+    The pupil phase (up to the pupil border as defined by the `NA` in `pp`) is returned.
++ `sz`:  size of the real-space array
++ `pp`:  PSF parameter structure
++ `sampling`: pixelpitch in real space as NTuple
++ `J`:  vector of zernike indices
++ `coefficients`: vector of coefficients corresponding to the indices listed in `J`.
+
+#Example:
+
+"""
+function get_zernike_pupil_phase(sz, pp, sampling) 
+    J = pp.aberrations.indices
+    coefficients = pp.aberrations.coefficients
+    index = pp.aberrations.index_style
+    border = k_pupil_pos(sz[1:2],pp,sampling[1:2])
+    X = ramp(1,sz[1],scale = 1/border[1])
+    Y = ramp(1,sz[2],scale = 1/border[2])
+    D = [[Zernike(j,coord=:cartesian,index=index)(x,y) for x in X, y in Y] for j in J ]
+    return reduce(+,map(*,D,coefficients))
+end
+
+"""
+    get_zernike_pupil(sz, pp, sampling, J::Vector{Int}, coefficients::Vector; index=:OSA) 
+    calculates the phases in the pupil for a given set of aberrations as defined by `J` and `coefficients`.
+    By default this follows the OSA nomenclature. See the help file of `ZernikePolynomials.jl` for more information.
+    The complex-valued pupil (up to the pupil border as defined by the `NA` in `pp`) is returned.
++ `sz`:  size of the real-space array
++ `pp`:  PSF parameter structure
++ `sampling`: pixelpitch in real space as NTuple
++ `J`:  vector of zernike indices
++ `coefficients`: vector of coefficients corresponding to the indices listed in `J`.
+
+#Example:
+
+"""
+function get_zernike_pupil(sz, pp, sampling) 
+    cispi.(2 .*get_zernike_pupil_phase(sz, pp, sampling))
+end
