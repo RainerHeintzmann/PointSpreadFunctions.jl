@@ -14,7 +14,7 @@ sampling=(80,80,100)
 # (with extra border): 397 ms using standard heuristics
 # Old Data (without extra border): 303 ms -> 0.145 µs / voxel  =  0.304 / prod(sz) * 1e6
 
-aberr = PSFs.Aberrations([Zernike_Spherical],[0.1])
+aberr = PSFs.Aberrations([Zernike_Spherical, Zernike_ObliqueAstigmatism],[0.1, 0.2])
 ppm = PSFParams(580.0, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodSincR, aberrations= aberr, FFTPlan=FFTW.MEASURE)
 p = psf(sz, ppm, sampling=sampling,use_resampling=true); # just to ensure that the measure is already executed
 

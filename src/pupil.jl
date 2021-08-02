@@ -1,22 +1,37 @@
-
+"""
+    pupil_θ(sz, pp::PSFParams, sampling)
+    returns the θ angle (to the optical axis) in the sample space as a pupil array.
+"""
 function pupil_θ(sz, pp::PSFParams, sampling)
     asin.(k_r(sz, pp, sampling)./k_0(pp))
 end
 
+"""
+    pupil_ϕ(sz, pp::PSFParams, sampling)
+    returns the azimuthal angle ϕ  in the sample space as a pupil array.
+"""
 function pupil_ϕ(sz, pp::PSFParams, sampling)
     ϕ_tuple.(k_xy(sz, pp, sampling))
 end
 
+"""
+    aplanatic_factor(sz, pp::PSFParams, sampling)
+    returns the aplanatic factor as specified in `pp.aplanatic` as a pupil array.
+"""
 function aplanatic_factor(sz, pp::PSFParams, sampling)
     pp.aplanatic.(pupil_θ(sz, pp, sampling))
 end
 
+"""
+    field_pupil(sz, pp, sampling)
+returns the pupil polarization as a 4D array with the XY polarization components stacked along the 4th dimension.
+"""
 function field_pupil(sz, pp, sampling)
     idx_to_dim(pp.polarization.(pp.dtype, k_xy_rel_pupil(sz,pp,sampling)), 4)
 end
 
 """
-    field_xyz(field, pp, sampling)
+    field_xy_to_xyz(field,pp,sampling)
     converts a 2D field at the pupil to a 2D field behind the lens, containing E_x, E_Y and E_z.
 """
 function field_xy_to_xyz(field,pp,sampling)
@@ -59,6 +74,10 @@ function pupil_xyz(sz, pp, sampling=nothing)
     end
 end
 
+"""
+    get_propagator(sz,pp,sampling)
+    retrieves the propagator phase, prpagating a single Z-slice.
+"""
 function get_propagator(sz,pp,sampling)
     if isnothing(sampling)
         sampling = get_Ewald_sampling(sz, pp)
@@ -72,7 +91,8 @@ function get_propagator(sz,pp,sampling)
 end
 
 """
-
+    get_propagator_gradient(prop_phase, scalar, xy_scale)
+calculates the gradient of the propagator along the X and Y directions of the pupil.
 """
 function get_propagator_gradient(prop_phase, scalar, xy_scale)
     #dr_prop_phase = ifelse.(prop_phase .== zero(pp.dtype), zero(pp.dtype), scalar.^2 ./ prop_term .* rr(pp.dtype, sz[1:2], scale = xy_scale))
@@ -113,13 +133,13 @@ end
     calculates the phases in the pupil for a given set of aberrations as defined by `J` and `coefficients`.
     By default this follows the OSA nomenclature. See the help file of `ZernikePolynomials.jl` for more information.
     The complex-valued pupil (up to the pupil border as defined by the `NA` in `pp`) is returned.
+Arguments:
 + `sz`:  size of the real-space array
 + `pp`:  PSF parameter structure
 + `sampling`: pixelpitch in real space as NTuple
 + `J`:  vector of zernike indices
 + `coefficients`: vector of coefficients corresponding to the indices listed in `J`.
-
-#Example:
+Example:
 
 """
 function get_zernike_pupil(sz, pp, sampling) 

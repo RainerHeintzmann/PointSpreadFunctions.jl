@@ -15,8 +15,10 @@ include("aPSFs.jl")
 """
     psf(sz::NTuple, pp::PSFParams; sampling=get_sampling(sz, pp))
 Example:
-pp = PSFParams(500.0,1.4,1.52)
-p = psf((128,128,128),pp; sampling=(50,50,100)); #; 
+```jdoctest
+julia> pp = PSFParams(500.0,1.4,1.52);
+julia> p = psf((128,128,128),pp; sampling=(50,50,100)); #; 
+```
 """
 function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, return_amp=false) # unclear why the resampling seems to be so bad
     if use_resampling == false

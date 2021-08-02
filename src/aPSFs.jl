@@ -198,15 +198,19 @@ end
 """
     apsf(sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false)
     dispatches to various amplitude point spread function calculation routines.
-Argument:
+    Note that the `method` entry in `pp` defines which calculation method to be used.
+    Alternatively a different method can be chosen like this: `apsf(::Type{MethodShell}, sz, ..)`.
+Arguments:
 + sz: NTuple of size to generate
 + pp: PSF parameter structure, also contains the dtype. See PSFParam() for details
 + sampling: NTuple for pixel pitch information
 + center_kz: if true, the McCutchen pupil will be centered along the kz direction. This is important to be able to apply a consecutive resampling without errors.
              However, the phase values are then not correct, which does not matter for intensity PSFs.
 Example:
-pp = PSFParams(500.0,1.4,1.52)
-p = apsf((128,128,128),pp; sampling=(50,50,100)); #; 
+```jdoctest
+julia> pp = PSFParams(500.0,1.4,1.52)
+julia> p = apsf((128,128,128),pp; sampling=(50,50,100));
+```
 """
 function apsf(sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
     apsf(pp.method, sz, pp, sampling=sampling, center_kz=center_kz)
