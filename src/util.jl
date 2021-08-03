@@ -11,7 +11,7 @@ amp_to_int(field) = sum(abs2.(field), dims=4)
 checks whether the point spread function is expected to be symmetric along the z-direction. Currently this is defined by the aberration list being empty.
 """
 function has_z_symmetry(pp::PSFParams)
-    return isnothing(pp.aberrations) || isempty(pp.aberrations) || isempty(pp.aberrations.indices); # will be changed later, when assymetric aberrations are allowed
+    return isnothing(pp.aberrations) || isempty(pp.aberrations.indices); # will be changed later, when assymetric aberrations are allowed
 end
 
 """
@@ -150,11 +150,35 @@ function jinc_r_2d(sz::NTuple, pp::PSFParams; sampling=nothing)
 end
 
 # my_disc(sz; rel_border=4/3, eps=0.05) = window_hanning(sz, border_in=rel_border.-eps, border_out=rel_border.+eps)
-my_disc(sz, pp) = disc(pp.dtype, sz, sz .* (4/6))  # This is the radius where there is no overlap and the diagonals (sqrt(2)) are still covered
+"""
+    my_disc(sz, pp) 
 
+creates a disc such that there is no overalp upon wrap-around, when convolving it with itself on this grid.
+This is the radius where there is no overlap. However, in the cornes of the calculation, the results are not
+100% accurate as something is missing.
+"""
+my_disc(sz, pp) = disc(pp.dtype, sz, sz .* (1/3))  # This is the radius where there is no overlap and the diagonals (sqrt(2)) are still covered
+# my_disc(sz, pp) = disc(pp.dtype, sz, sz .* (sqrt(2)/3))  # This is the radius where there is no overlap and the diagonals (sqrt(2)) are still covered
+
+"""
+    iftz(arr)
+
+inverse Fourier transform only along the 3rd dimension (kz).
+
+Arguments:
++ arr:  array to transform along kz
+"""
 iftz(arr) = ift(arr,(3,))
 
-theta_z(sz) = (zz(sz) .> 0) # The direction is important due to the highest frequency position at even-sized FFTs
+"""
+    theta_z(sz)
+
+a θ function along the z direction, being one for z positon > 0 and zero elsewhere.
+
+Arguments:
++ sz:  size of the array
+"""
+theta_z(sz) = (zz((1,1,sz[3])) .> 0) # The direction is important due to the highest frequency position at even-sized FFTs
 
 
 
@@ -162,6 +186,9 @@ theta_z(sz) = (zz(sz) .> 0) # The direction is important due to the highest freq
     k_0(pp::PSFParams)
 
 k in the medium as n/lambda.   (1/space units
+
+Arguments:
++ `pp`:  PSF parameter structure
 """ 
 function k_0(pp::PSFParams)
     pp.dtype(pp.n / pp.λ)
@@ -192,7 +219,7 @@ function k_dz(pp::PSFParams)
 end
 
 """
-    k_scale(sz,sampling)
+    k_scale(sz,pp,sampling)
     pixelpitch (as NTuple) in k-space
 + `sz`:  size of the real-space array
 + `pp`:  PSF parameter structure

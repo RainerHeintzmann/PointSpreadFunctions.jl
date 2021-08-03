@@ -144,11 +144,14 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
     pupil = start_pupil
     for z in start_z:-1:2 # from the middle to the start
         slice = ift2d(pupil) # should be ifft2d for speed reasons
-        select_region!(slice, slices[:,:,z:z,:], new_size=sz[1:2])
+        dst = @view slices[:,:,z:z,:]
+        select_region!(slice, dst, new_size=sz[1:2])
         pupil = ft2d(slice .* real_window)
         pupil .*= prop_pupil 
     end
-    select_region!(ift2d(pupil), slices[:,:,1:1,:], new_size=sz[1:2])
+    dst = @view slices[:,:,1:1,:]
+    select_region!(ift2d(pupil), dst, new_size=sz[1:2])
+
     if has_z_symmetry(pp) # to save some speed
         dz = sz[3] - (start_z+1)
         slices[:,:,start_z+1:start_z+1+dz,:] .= conj(slices[:,:,start_z-1:-1:start_z-1-dz,:]);
@@ -157,11 +160,13 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
         pupil = start_pupil .* prop_pupil
         for z in start_z+1:sz[3]-1  # from the middle forward
             slice = ift2d(pupil)
-            select_region!(slice, slices[:,:,z:z,:], new_size=sz[1:2])
+            dst = @view slices[:,:,z:z,:]
+            select_region!(slice, dst, new_size=sz[1:2])
             pupil = ft2d(slice .* real_window)
             pupil .*= prop_pupil 
         end
-        select_region!(ift2d(pupil), slices[:,:,sz[3]:sz[3],:], new_size=sz[1:2])
+        dst = @view slices[:,:,sz[3]:sz[3],:]
+        select_region!(ift2d(pupil), dst, new_size=sz[1:2])
     end
     return slices
 end
