@@ -13,4 +13,4 @@ makedocs(modules=[PSFs], sitename="PSFs Documentation", doctest = false,
                     ]
         )
 
-deploydocs(repo = "github.com/RainerHeintzmann/PSFs.jl.git")
+deploydocs(repo = "github.com/RainerHeintzmann/PSFs.jl.git", devbranch = "main")
