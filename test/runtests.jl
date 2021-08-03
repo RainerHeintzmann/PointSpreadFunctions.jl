@@ -1,9 +1,7 @@
 using Test
-using Random
 
 using PSFs
 using NDTools
-using BenchmarkTools
 
 pp = PSFParams()
 sz = (128,128,128)
