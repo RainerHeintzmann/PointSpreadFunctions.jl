@@ -115,6 +115,30 @@ struct PSFParams
     pixelshape # here functions can be supplied, which account for the pixelshape influence (itegration over pixel size).
 end
 
+"""
+    PSFParams(λ=500, NA=1.2, n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
+    aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
+    aberrations=Aberrations(), pixelshape=nothing)
+
+creates the PSFParams structure via this constructor.
+
+Arguments:
++ λ:            Vacuum wavelength
++ NA:           numerical aperture
++ n:            refractive index of the embedding AND immersion medium
++ dtype:        real-valued data type to generate PSF for
++ mode:         microscopy mode to calculate PSF for   ::PSFMode
++ polarization: a function calculating the polarization from a given Tuple of relative-k pupil vectors
++ aplanatic:    aplanatic factor. Provided as a function of angle θ
++ method:       the method of calculation
++ FFTPlan:      information on how to calculate the FFTW plan
+
+Example:
+```jdoctest
+julia> using FFTW
+julia> ppm = PSFParams(580.0, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodSincR, aberrations= aberr, FFTPlan=FFTW.MEASURE)
+```
+"""
 function PSFParams(my_λ=500, my_NA=1.2, my_n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
                     aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
                     aberrations=Aberrations(), pixelshape=nothing)
