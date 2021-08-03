@@ -1,12 +1,19 @@
 # PSFs.jl
-Toolbox for calculating optical PSFs.
-For detailed instruction see https://RainerHeintzmann.github.io/PSFs.jl/stable/ .
+Toolbox for calculating optical PSFs. It incorporates aberrations (specified though Zernike coefficients) and supports a number of
+models for calculation (`PSFs.MethodSincR`, `PSFs.MethodPropagate`, `PSFs.MethodPropagateIterative`), some are faster and some more accurate.
+
+For detailed documentation, see the docs/dev (or docs/stable) link below.
+
+## Installation
+To get the latest stable release of PSFs.jl type `]` in the Julia REPL:
+```
+] add https://github.com/RainerHeintzmann/PSFs.jl
+```
 
 
 | **Documentation**                       | **Build Status**                          | **Code Coverage**               |
 |:---------------------------------------:|:-----------------------------------------:|:-------------------------------:|
 | [![][docs-stable-img]][docs-stable-url] [![][docs-dev-img]][docs-dev-url] | [![][CI-img]][CI-url] | [![][codecov-img]][codecov-url] |
-
 
 
 
