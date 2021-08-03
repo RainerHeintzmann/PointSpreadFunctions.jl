@@ -43,8 +43,11 @@ end
 
 """
     Aberrations(indices=[],coefficients=[];index_style = :OSA)
-    defining Zernike phase aberrations via a list of indices and coefficients and an indexing style.
-    By default, no Aberrations are defined.
+
+defining Zernike phase aberrations via a list of indices and coefficients and an indexing style.
+By default, no Aberrations are defined.
+
+Arguments:
 + indices:  Vector of indices
 + coefficients: Vector of corresponding coefficients
 + index_style: type of indexing used. By defaul :OSA is used (See: https://en.wikipedia.org/wiki/Zernike_polynomials#OSA/ANSI_standard_indices)
@@ -66,7 +69,8 @@ Here is a list of constants defining the main indices (OSA style):
 `:Zernike_VerticalSecondaryAstigmatism` = 13
 `:Zernike_VerticalQuadrafoil` = 14
 
-see also: package `ZernikePolynomials.jl`, and https://en.wikipedia.org/wiki/Zernike_polynomials
+See also: 
++ package `ZernikePolynomials.jl`, and https://en.wikipedia.org/wiki/Zernike_polynomials
 """
 function Aberrations(indices=[],coefficients=[];index_style = :OSA)
     Aberrations(indices,coefficients,index_style)
@@ -76,8 +80,10 @@ end
     PSFParams(my_λ=500, my_NA=1.2, my_n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
     aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
     aberrations=Aberrations(), pixelshape=nothing)
-    This structure stores all the general parameters needed to calculate the point spread function.
-    Only pixel-pitch and image size information is handles seperately.
+
+This structure stores all the general parameters needed to calculate the point spread function.
+Only pixel-pitch and image size information is handles seperately.
+
 Members are:
 + λ:            Vacuum wavelength
 + NA:           numerical aperture
@@ -88,6 +94,7 @@ Members are:
 + aplanatic:    aplanatic factor. Provided as a function of angle θ
 + method:       the method of calculation
 + FFTPlan:      information on how to calculate the FFTW plan
+
 Example:
 ```jdoctest
 julia> using FFTW

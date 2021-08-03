@@ -14,6 +14,14 @@ include("aPSFs.jl")
 
 """
     psf(sz::NTuple, pp::PSFParams; sampling=get_sampling(sz, pp))
+
+calculates the point spread function (psf), i.e. the image of a single (very small) emitter. Most of the parameters
+(such as refractive index, numerical aperture, vacuum wavelength, aberrations etc.) are hidden in the parameter structure argument `pp`,
+which should be generated via the `PSFParams()` constructor. See ``PSFParams()` for details.
+
+See also:
++ apsf():  calculates the underlying aplitude point spread function (apsf)
+
 Example:
 ```jdoctest
 julia> pp = PSFParams(500.0,1.4,1.52);

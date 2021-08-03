@@ -1,6 +1,7 @@
 """
     pupil_θ(sz, pp::PSFParams, sampling)
-    returns the θ angle (to the optical axis) in the sample space as a pupil array.
+
+returns the θ angle (to the optical axis) in the sample space as a pupil array.
 """
 function pupil_θ(sz, pp::PSFParams, sampling)
     asin.(k_r(sz, pp, sampling)./k_0(pp))
@@ -8,7 +9,8 @@ end
 
 """
     pupil_ϕ(sz, pp::PSFParams, sampling)
-    returns the azimuthal angle ϕ  in the sample space as a pupil array.
+
+returns the azimuthal angle ϕ  in the sample space as a pupil array.
 """
 function pupil_ϕ(sz, pp::PSFParams, sampling)
     ϕ_tuple.(k_xy(sz, pp, sampling))
@@ -16,7 +18,8 @@ end
 
 """
     aplanatic_factor(sz, pp::PSFParams, sampling)
-    returns the aplanatic factor as specified in `pp.aplanatic` as a pupil array.
+
+returns the aplanatic factor as specified in `pp.aplanatic` as a pupil array.
 """
 function aplanatic_factor(sz, pp::PSFParams, sampling)
     pp.aplanatic.(pupil_θ(sz, pp, sampling))
@@ -24,6 +27,7 @@ end
 
 """
     field_pupil(sz, pp, sampling)
+
 returns the pupil polarization as a 4D array with the XY polarization components stacked along the 4th dimension.
 """
 function field_pupil(sz, pp, sampling)
@@ -32,7 +36,8 @@ end
 
 """
     field_xy_to_xyz(field,pp,sampling)
-    converts a 2D field at the pupil to a 2D field behind the lens, containing E_x, E_Y and E_z.
+
+converts a 2D field at the pupil to a 2D field behind the lens, containing E_x, E_Y and E_z.
 """
 function field_xy_to_xyz(field,pp,sampling)
     if size(field)[4] == 1
@@ -53,7 +58,8 @@ end
 
 """
     field_xyz(sz, pp, sampling)
-    creates a 2D pupil field behind the lens, containing E_x, E_Y and E_z.
+
+creates a 2D pupil field behind the lens, containing E_x, E_Y and E_z.
 """
 function field_xyz(sz, pp, sampling)
     field_xy_to_xyz(field_pupil(sz, pp, sampling), pp, sampling)
@@ -61,7 +67,8 @@ end
 
 """
     pupil_xyz(sz, pp, sampling=nothing)
-    creates a pupil with electric field distributions in XYZ. Returns a 4D dataset with the electric field components along the 4th dimension.
+
+creates a pupil with electric field distributions in XYZ. Returns a 4D dataset with the electric field components along the 4th dimension.
 """
 function pupil_xyz(sz, pp, sampling=nothing)
     if isnothing(sampling)
@@ -76,7 +83,8 @@ end
 
 """
     get_propagator(sz,pp,sampling)
-    retrieves the propagator phase, prpagating a single Z-slice.
+
+retrieves the propagator phase, prpagating a single Z-slice.
 """
 function get_propagator(sz,pp,sampling)
     if isnothing(sampling)
@@ -92,6 +100,7 @@ end
 
 """
     get_propagator_gradient(prop_phase, scalar, xy_scale)
+
 calculates the gradient of the propagator along the X and Y directions of the pupil.
 """
 function get_propagator_gradient(prop_phase, scalar, xy_scale)
@@ -104,18 +113,47 @@ function get_propagator_gradient(prop_phase, scalar, xy_scale)
 end
 
 """
-    get_zernike_pupil_phase(sz, pp, sampling, J::Vector{Int}, coefficients::Vector; index=:OSA) 
-    calculates the phases in the pupil for a given set of aberrations as defined by `J` and `coefficients`.
-    By default this follows the OSA nomenclature. See the help file of `ZernikePolynomials.jl` for more information.
-    The pupil phase (up to the pupil border as defined by the `NA` in `pp`) is returned.
+    get_zernike_pupil_phase(sz, pp, sampling) 
+
+calculates the phases in the pupil for a given set of aberrations as defined by `J` and `coefficients`.
+By default this follows the OSA nomenclature. See the help file of `ZernikePolynomials.jl` for more information.
+The pupil phase (up to the pupil border as defined by the `NA` in `pp`) is returned.
+
+Arguments:
 + `sz`:  size of the real-space array
 + `pp`:  PSF parameter structure
 + `sampling`: pixelpitch in real space as NTuple
-+ `J`:  vector of zernike indices
-+ `coefficients`: vector of coefficients corresponding to the indices listed in `J`.
 
-#Example:
+Example:
+```jdoctest
+julia> using PSFs, FFTW
 
+julia> aberr = PSFs.Aberrations([Zernike_Spherical, Zernike_ObliqueAstigmatism],[0.1, 0.2])
+Aberrations([12, 3], [0.1, 0.2], :OSA)
+
+julia> pp = PSFParams(580.0, 1.4, 1.518; aberrations=aberr)
+PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodPropagateIterative, nothing, Aberrations([12, 3], [0.1, 0.2], :OSA), nothing)
+
+julia> sz = (10,10,64)
+(10, 10, 64)
+
+julia> sampling=(190,190,100)
+(190, 190, 100)
+
+julia> PSFs.get_zernike_pupil_phase(sz,pp,sampling)
+10×10 Matrix{Float64}:
+ 0.0   0.0         0.0         0.0         0.0         0.0         0.0         0.0         0.0         0.0
+ 0.0   0.0         0.0         0.533599    0.202003   -0.0206203  -0.170662   -0.21173     0.0         0.0
+ 0.0   0.0         0.477274    0.186398    0.0287554  -0.104828   -0.250743   -0.3726     -0.361221    0.0
+ 0.0   0.533599    0.186398    0.0937363   0.0736565   0.016983   -0.112676   -0.278928   -0.3726     -0.21173
+ 0.0   0.202003    0.0287554   0.0736565   0.154747    0.162853    0.0615812  -0.112676   -0.250743   -0.170662
+ 0.0  -0.0206203  -0.104828    0.016983    0.162853    0.223607    0.162853    0.016983   -0.104828   -0.0206203
+ 0.0  -0.170662   -0.250743   -0.112676    0.0615812   0.162853    0.154747    0.0736565   0.0287554   0.202003
+ 0.0  -0.21173    -0.3726     -0.278928   -0.112676    0.016983    0.0736565   0.0937363   0.186398    0.533599
+ 0.0   0.0        -0.361221   -0.3726     -0.250743   -0.104828    0.0287554   0.186398    0.477274    0.0
+ 0.0   0.0         0.0        -0.21173    -0.170662   -0.0206203   0.202003    0.533599    0.0         0.0
+
+```
 """
 function get_zernike_pupil_phase(sz, pp, sampling) 
     J = pp.aberrations.indices
@@ -129,18 +167,47 @@ function get_zernike_pupil_phase(sz, pp, sampling)
 end
 
 """
-    get_zernike_pupil(sz, pp, sampling, J::Vector{Int}, coefficients::Vector; index=:OSA) 
-    calculates the phases in the pupil for a given set of aberrations as defined by `J` and `coefficients`.
-    By default this follows the OSA nomenclature. See the help file of `ZernikePolynomials.jl` for more information.
-    The complex-valued pupil (up to the pupil border as defined by the `NA` in `pp`) is returned.
+    get_zernike_pupil(sz, pp, sampling)  
+
+calculates the phases in the pupil for a given set of aberrations as defined by `J` and `coefficients`.
+By default this follows the OSA nomenclature. See the help file of `ZernikePolynomials.jl` for more information.
+The complex-valued pupil (up to the pupil border as defined by the `NA` in `pp`) is returned.
+
 Arguments:
 + `sz`:  size of the real-space array
 + `pp`:  PSF parameter structure
 + `sampling`: pixelpitch in real space as NTuple
-+ `J`:  vector of zernike indices
-+ `coefficients`: vector of coefficients corresponding to the indices listed in `J`.
-Example:
 
+Example:
+```jdoctest
+julia> using PSFs, FFTW
+
+julia> aberr = PSFs.Aberrations([Zernike_Spherical, Zernike_ObliqueAstigmatism],[0.1, 0.2])
+Aberrations([12, 3], [0.1, 0.2], :OSA)
+
+julia> pp = PSFParams(580.0, 1.4, 1.518; aberrations=aberr)
+PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodPropagateIterative, nothing, Aberrations([12, 3], [0.1, 0.2], :OSA), nothing)
+
+julia> sz = (10,10,64)
+(10, 10, 64)
+
+julia> sampling=(190,190,100)
+(190, 190, 100)
+
+julia> PSFs.get_zernike_pupil(sz,pp,sampling)
+10×10 Matrix{ComplexF64}:
+ 1.0+0.0im        1.0+0.0im               1.0+0.0im             1.0+0.0im               1.0+0.0im       …          1.0+0.0im             1.0+0.0im               1.0+0.0im             1.0+0.0im
+ 1.0+0.0im        1.0+0.0im               1.0+0.0im       -0.977799-0.209546im     0.297025+0.95487im         0.478105-0.878303im   0.238146-0.971229im          1.0+0.0im             1.0+0.0im
+ 1.0+0.0im        1.0+0.0im         -0.989823+0.142305im   0.389073+0.921207im     0.983723+0.179694im     -0.00466964-0.999989im  -0.696362-0.717691im    -0.643318-0.765599im        1.0+0.0im
+ 1.0+0.0im  -0.977799-0.209546im     0.389073+0.921207im   0.831518+0.555499im     0.894807+0.446453im        0.759688-0.650288im  -0.180764-0.983527im    -0.696362-0.717691im   0.238146-0.971229im
+ 1.0+0.0im   0.297025+0.95487im      0.983723+0.179694im   0.894807+0.446453im     0.563395+0.826187im        0.926073+0.377344im   0.759688-0.650288im  -0.00466964-0.999989im   0.478105-0.878303im
+ 1.0+0.0im   0.991619-0.129199im     0.790818-0.612051im   0.994312+0.106505im     0.520607+0.853797im  …     0.520607+0.853797im   0.994312+0.106505im     0.790818-0.612051im   0.991619-0.129199im
+ 1.0+0.0im   0.478105-0.878303im  -0.00466964-0.999989im   0.759688-0.650288im     0.926073+0.377344im        0.563395+0.826187im   0.894807+0.446453im     0.983723+0.179694im   0.297025+0.95487im
+ 1.0+0.0im   0.238146-0.971229im    -0.696362-0.717691im  -0.180764-0.983527im     0.759688-0.650288im        0.894807+0.446453im   0.831518+0.555499im     0.389073+0.921207im  -0.977799-0.209546im
+ 1.0+0.0im        1.0+0.0im         -0.643318-0.765599im  -0.696362-0.717691im  -0.00466964-0.999989im        0.983723+0.179694im   0.389073+0.921207im    -0.989823+0.142305im        1.0+0.0im
+ 1.0+0.0im        1.0+0.0im               1.0+0.0im        0.238146-0.971229im     0.478105-0.878303im        0.297025+0.95487im   -0.977799-0.209546im          1.0+0.0im             1.0+0.0im
+
+```
 """
 function get_zernike_pupil(sz, pp, sampling) 
     cispi.(2 .*get_zernike_pupil_phase(sz, pp, sampling))

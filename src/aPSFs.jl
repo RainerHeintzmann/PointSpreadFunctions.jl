@@ -56,6 +56,17 @@ end
 
 
 # This function is needed for the propagate method
+"""
+    apply_propagators(pupil, z_planes, pp::PSFParams; sampling=nothing) 
+
+propagates a given `pupil` by a number of `z_planes` (almost) symmetrically in both directions.
+The result is a stack of propagated pupils. The slice-to-slice propagator is obtained via the
+`get_propagator` method.
+
+See also:
++ get_propagator
+
+"""
 function apply_propagators(pupil, z_planes, pp::PSFParams; sampling=nothing) 
     sz = (size(pupil)[1:2]...,z_planes,size(pupil)[4])
     # calculate the phase derivatives
@@ -197,15 +208,21 @@ end
 
 """
     apsf(sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false)
-    dispatches to various amplitude point spread function calculation routines.
-    Note that the `method` entry in `pp` defines which calculation method to be used.
-    Alternatively a different method can be chosen like this: `apsf(::Type{MethodShell}, sz, ..)`.
+
+dispatches to various amplitude point spread function calculation routines.
+Note that the `method` entry in `pp` defines which calculation method to be used.
+Alternatively a different method can be chosen like this: `apsf(::Type{MethodShell}, sz, ..)`.
+
 Arguments:
 + sz: NTuple of size to generate
 + pp: PSF parameter structure, also contains the dtype. See PSFParam() for details
 + sampling: NTuple for pixel pitch information
 + center_kz: if true, the McCutchen pupil will be centered along the kz direction. This is important to be able to apply a consecutive resampling without errors.
              However, the phase values are then not correct, which does not matter for intensity PSFs.
+
+See also:
++ psf():    calculates the intensity point spread function (psf) by taking (sum along field components of) the absolute square of the corresponding apsf. 
+
 Example:
 ```jdoctest
 julia> pp = PSFParams(500.0,1.4,1.52)
