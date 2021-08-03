@@ -77,28 +77,32 @@ function Aberrations(indices=[],coefficients=[];index_style = :OSA)
 end
 
 """
-    PSFParams(my_λ=500, my_NA=1.2, my_n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
-    aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
-    aberrations=Aberrations(), pixelshape=nothing)
+    PSFParams
 
 This structure stores all the general parameters needed to calculate the point spread function.
 Only pixel-pitch and image size information is handles seperately.
 
-Members are:
+Structure Members:
 + λ:            Vacuum wavelength
 + NA:           numerical aperture
 + n:            refractive index of the embedding AND immersion medium
 + dtype:        real-valued data type to generate PSF for
-+ mode:         microscopy mode to calculate PSF for   ::PSFMode
++ mode:         microscopy mode to calculate PSF for. See the constructor PSFParams() for more details.
 + polarization: a function calculating the polarization from a given Tuple of relative-k pupil vectors
 + aplanatic:    aplanatic factor. Provided as a function of angle θ
 + method:       the method of calculation
 + FFTPlan:      information on how to calculate the FFTW plan
 
+See also:
++ PSFParams()
+
 Example:
 ```jdoctest
-julia> using FFTW
+julia> using FFTW, PSFs
+
 julia> ppm = PSFParams(580.0, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodSincR, aberrations= aberr, FFTPlan=FFTW.MEASURE)
+PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodSincR, 0x00000000, nothing, nothing)
+
 ```
 """
 struct PSFParams
@@ -126,17 +130,25 @@ Arguments:
 + λ:            Vacuum wavelength
 + NA:           numerical aperture
 + n:            refractive index of the embedding AND immersion medium
++ pol: a function calculating the polarization from a given Tuple of relative-k pupil vectors
 + dtype:        real-valued data type to generate PSF for
-+ mode:         microscopy mode to calculate PSF for   ::PSFMode
-+ polarization: a function calculating the polarization from a given Tuple of relative-k pupil vectors
-+ aplanatic:    aplanatic factor. Provided as a function of angle θ
-+ method:       the method of calculation
-+ FFTPlan:      information on how to calculate the FFTW plan
++ mode:         microscopy mode to calculate PSF for ::PSFMode. Currently only `ModeWidefield` is implemented
++ method:         microscopy mode to calculate PSF for 
+                valid options are currently:
+                + MethodPropagate: Angulare spectrum propagation. This version does NOT account for wrap around problems yielding problems at larger out-of-focus distances
+                + MethodPropagateIterativ (default): Angulare spectrum propagation accounting from wrap-around problems in each propagation step by applying a perfectly matched layer (PML).
+                + MethodShell: Angulare spectrum propagation with a slightly different calculation order. This version does NOT account for wrap around problems yielding problems at larger out-of-focus distances
+                + MethodSincR: Based on first calculating a SincR function in real space and applying consecutive filtering steps. It accounts for wrap around problems but requires a quite high sampling along the Z direction.
++ aplanatic:    aplanatic factor. Provided as a function of angle θ. 
++ FFTPlan:      information on how to calculate the FFTW plan. Default: nothing (using FFTW.ESTIMATE)
 
 Example:
 ```jdoctest
-julia> using FFTW
+julia> using FFTW, PSFs
+
 julia> ppm = PSFParams(580.0, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodSincR, aberrations= aberr, FFTPlan=FFTW.MEASURE)
+PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodSincR, 0x00000000, nothing, nothing)
+
 ```
 """
 function PSFParams(my_λ=500, my_NA=1.2, my_n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 

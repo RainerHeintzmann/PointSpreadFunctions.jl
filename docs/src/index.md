@@ -9,6 +9,9 @@ Different modes of calculation are possible and more will be added in the future
 
 ```@docs
 PSFParams
+PSFParams(my_λ=500, my_NA=1.2, my_n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
+                    aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
+                    aberrations=Aberrations(), pixelshape=nothing)
 psf
 apsf
 ```
