@@ -100,8 +100,8 @@ Example:
 ```jdoctest
 julia> using FFTW, PSFs
 
-julia> ppm = PSFParams(580.0, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodSincR, aberrations= aberr, FFTPlan=FFTW.MEASURE)
-PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodSincR, 0x00000000, nothing, nothing)
+julia> ppm = PSFParams(0.580, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodSincR, aberrations= aberr, FFTPlan=FFTW.MEASURE)
+PSFParams(0.58, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodSincR, 0x00000000, nothing, nothing)
 
 ```
 """
@@ -120,14 +120,14 @@ struct PSFParams
 end
 
 """
-    PSFParams(λ=500, NA=1.2, n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
+    PSFParams(λ=0.5, NA=1.2, n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
     aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
     aberrations=Aberrations(), pixelshape=nothing)
 
 creates the PSFParams structure via this constructor.
 
 Arguments:
-+ λ:            Vacuum wavelength
++ λ:            Vacuum wavelength (same units as sampling, default is 0.5 µm)
 + NA:           numerical aperture
 + n:            refractive index of the embedding AND immersion medium
 + pol: a function calculating the polarization from a given Tuple of relative-k pupil vectors
@@ -146,12 +146,12 @@ Example:
 ```jdoctest
 julia> using FFTW, PSFs
 
-julia> ppm = PSFParams(580.0, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodSincR, aberrations= aberr, FFTPlan=FFTW.MEASURE)
-PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodSincR, 0x00000000, nothing, nothing)
+julia> ppm = PSFParams(0.58, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodSincR, aberrations= aberr, FFTPlan=FFTW.MEASURE)
+PSFParams(0.58, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodSincR, 0x00000000, nothing, nothing)
 
 ```
 """
-function PSFParams(my_λ=500, my_NA=1.2, my_n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
+function PSFParams(my_λ=0.5, my_NA=1.2, my_n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
                     aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
                     aberrations=Aberrations(), pixelshape=nothing)
     PSFParams(my_λ, my_NA, my_n, dtype, mode, pol, aplanatic, method, FFTPlan, aberrations, pixelshape)

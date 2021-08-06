@@ -5,7 +5,7 @@ using NDTools
 
 pp = PSFParams()
 sz = (128,128,128)
-sampling=(100,100,150)
+sampling=(0.100,0.100,0.150)
 
 @testset "Compare scalar aPSFs" begin
     a_prop = apsf(PSFs.MethodPropagate, sz,pp, sampling=sampling);
@@ -20,7 +20,7 @@ end
 
 pp = PSFParams(pol=pol_x)
 sz = (128,128,128)
-sampling=(100,100,150)
+sampling=(0.100,0.100,0.150)
 
 @testset "Compare scalar aPSFs" begin
     a_prop = apsf(PSFs.MethodPropagate, sz,pp, sampling=sampling);
