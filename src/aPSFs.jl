@@ -211,6 +211,62 @@ function apsf(::Type{MethodShell}, sz::NTuple, pp::PSFParams; sampling=nothing, 
     return res # extract the central bit, which avoids the wrap-around effects
 end
 
+
+# Calculates I0, I1 and I2 according to the Richards and Wolf paper
+# The calculation is done on an RZ plane and then interpolated to a 3D volume.
+function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
+    @show sampling_r = min(sampling[1],sampling[2])/2.0
+    diagonal = sqrt(sum(abs2.(sz[1:2] .* sampling[1:2]))) / 2.0;
+    @show sr = ceil(Int64, diagonal/sampling_r) + 1
+    r = xx((sr,), scale=sampling_r, offset=CtrCorner) # a generator for radius
+    k = 2pi / (pp.λ / pp.n);
+    kz = yy((1,sz[3]), scale=k*sampling[3])
+    function integrate!(I, w, theta)  # w includes the aplanatic factor
+        (sint,cost) = sincos(theta);
+        krsint =  (k*sint).*r
+        ciskzcost =  cis.(kz.*cost)
+        I[:,:,1] .+= (w* sint*(1+cost)).*besselj0.(krsint) .* ciskzcost
+        I[:,:,2] .+= (w* sint^2) .*besselj1.(krsint) .* ciskzcost
+        I[:,:,3] .+= (w* sint.*(1-cost)).*besselj.(2,krsint) .* ciskzcost
+    end
+    α = asin(pp.NA / pp.n); # maximal aperture angle
+    # Now perform the integration according to Simpsons rule
+    N = 80
+    I012 = zeros(Complex{pp.dtype}, (sr,sz[3],3)) # I0, I1 and I2
+    h = α / N
+    for n in 0:N-1 # integrate using Simpsons rule
+        theta = h*n
+        apl = pp.aplanatic(theta)
+        if n==1 || n==N-1
+            integrate!(I012, h/6*apl, theta) # first value
+        else
+            integrate!(I012, 2*h/6*apl, theta) # intermediate values (count twice in the sum)
+        end
+        theta = h*(n+0.5) # middle value(s)
+        integrate!(I012, 4*h/6*apl, theta) # middle values count 4 times
+    end
+    integrate!(I012, h/6, α*pp.aplanatic(α)) # last value
+
+    # Interpolate the RZ-results onto the 3D grid
+    phi = phiphi((sz[1],sz[2]), scale=(sampling[1],sampling[2]))
+    rpos = rr((sz[1],sz[2]), scale=(sampling[1],sampling[2]))
+    cosphi = cos.(phi)
+    cos2phi = cos.(2 .*phi)
+    sin2phi = sin.(2 .*phi)
+    r_idx = 1 .+ floor.(Int64, rpos ./ sampling_r) # index position
+    w = 1.0 .- (rpos/ sampling_r .+ 1 .- r_idx) # index position
+    E = zeros(Complex{pp.dtype}, (sz...,3)) # I0, I1 and I2
+    for z = 1:sz[3]
+        I0 = @view I012[:,z,1]
+        I1 = @view I012[:,z,2]
+        I2 = @view I012[:,z,3]
+        E[:,:,z,1] .= -im.*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
+        E[:,:,z,2] .= -im.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi
+        E[:,:,z,3] .= -2 .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*cosphi
+    end
+    return E
+end
+
 """
     apsf(sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false)
 
