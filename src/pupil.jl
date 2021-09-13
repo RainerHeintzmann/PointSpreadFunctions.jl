@@ -21,8 +21,12 @@ end
 
 returns the aplanatic factor as specified in `pp.aplanatic` as a pupil array.
 """
-function aplanatic_factor(sz, pp::PSFParams, sampling)
-    pp.aplanatic.(pupil_θ(sz, pp, sampling))
+function aplanatic_factor(sz, pp::PSFParams, sampling; is_proj=false)
+    if is_proj
+        pp.aplanatic.(pupil_θ(sz, pp, sampling)) ./ cos.(pupil_θ(sz, pp, sampling))
+    else
+        pp.aplanatic.(pupil_θ(sz, pp, sampling))
+    end
 end
 
 """
@@ -75,9 +79,9 @@ function pupil_xyz(sz, pp, sampling=nothing)
         sampling = get_Ewald_sampling(sz, pp)
     end
     if isnothing(pp.aberrations) || isempty(pp.aberrations.indices)
-        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
+        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling, is_proj=true) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
     else
-        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling) .* get_zernike_pupil(sz, pp, sampling) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
+        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling, is_proj=true) .* get_zernike_pupil(sz, pp, sampling) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
     end
 end
 
