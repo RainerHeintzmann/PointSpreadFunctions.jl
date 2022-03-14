@@ -35,7 +35,7 @@ end
 returns the pupil polarization as a 4D array with the XY polarization components stacked along the 4th dimension.
 """
 function field_pupil(sz, pp, sampling)
-    idx_to_dim(pp.polarization.(pp.dtype, k_xy_rel_pupil(sz,pp,sampling)), 4)
+    idx_to_dim(expand_dims(pp.polarization.(pp.dtype, k_xy_rel_pupil(sz,pp,sampling)),Val(3)))
 end
 
 """
