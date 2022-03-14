@@ -152,9 +152,11 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
     dst = @view slices[:,:,1:1,:]
     select_region!(ift2d(pupil), dst, new_size=sz[1:2])
 
-    if has_z_symmetry(pp) # to save some speed
+    # the check below is disabled for now, since there needs to be also an XY-flip to be correct
+    if false # has_z_symmetry(pp) # to save some speed
         dz = sz[3] - (start_z+1)
-        slices[:,:,start_z+1:start_z+1+dz,:] .= conj(slices[:,:,start_z-1:-1:start_z-1-dz,:]);
+        # missing XY-flip:
+        slices[:,:,start_z+1:start_z+1+dz,:] .= conj.(slices[:,:,start_z-1:-1:start_z-1-dz,:]);
     else
         prop_pupil = conj(prop_pupil) # from now the advancement is in the opposite direction
         pupil = start_pupil .* prop_pupil
