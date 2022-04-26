@@ -3,7 +3,7 @@ using FourierTools: center_pos, FourierJoin
 using FourierTools, NDTools, IndexFunArrays, SpecialFunctions, FFTW
 using ZernikePolynomials
 export PSFParams, sinc_r, jinc_r_2d, pupil_xyz, apsf, psf, k0, kxy, aplanatic_factor
-export ModeWidefield, ModeConfocal, Mode4Pi
+export ModeWidefield, ModeConfocal, Mode4Pi, get_Abbe_limit, get_Nyquist_limit
 
 include("aplanatic.jl")
 include("PSF_types.jl")

@@ -31,13 +31,37 @@ julia> pp = PSFParams(580.0, 1.4, 1.518)
 PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodPropagateIterative, nothing, Aberrations(Any[], Any[], :OSA), nothing)
 
 julia> PSFs.get_Abbe_limit(pp)
-(191.04085f0, 191.04085f0, 234.38591f0)
+(191.04085f0, 191.04085f0, 622.8464f0)
 ```
 """
 function get_Abbe_limit(pp::PSFParams)
     d_xy = pp.λ ./ (2 .* pp.n) 
-    d_z = (1 - cos(asin(pp.NA/ pp.n))) * pp.λ / pp.n
+    d_z =  pp.λ / (pp.n * (1 - cos(asin(pp.NA/ pp.n))))
     pp.dtype.((d_xy,d_xy,d_z))
+end
+
+"""
+    get_Nyquist_limit(pp::PSFParams)
+
+returns the Nyquist sampling limit of incoherent imaging in real space as a Tuple with 3 entries. Note that the coherent limit needs only a factor of
+two less sampling, as long as no intensity is calculated. This allows upsampling right before calculating intensities.
+
+See also:
++ get_Abbe_limit()
+
+Example:
+```jdoctest
+julia> using PSFs
+
+julia> pp = PSFParams(580.0, 1.4, 1.518)
+PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodPropagateIterative, nothing, Aberrations(Any[], Any[], :OSA), nothing)
+
+julia> PSFs.get_Nyquist_limit(pp)
+(95.520424f0, 95.520424f0, 311.4232f0)
+```
+"""
+function get_Nyquist_limit(pp::PSFParams)
+    get_Abbe_limit(pp) ./ 2
 end
 
 """
