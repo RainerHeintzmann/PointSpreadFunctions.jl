@@ -29,6 +29,14 @@ julia> p = psf((128,128,128),pp; sampling=(50,50,100)); #;
 ```
 """
 function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, return_amp=false) # unclear why the resampling seems to be so bad
+    sz, sampling, is2d = let 
+        if length(sz)>2
+            sz, sampling, false
+        else
+            (sz[1:2]...,1), (sampling[1:2]..., eps(eltype(sampling))), true
+        end
+    end
+
     if use_resampling == false
         amp = apsf(sz, pp, sampling=sampling)
         if return_amp
@@ -40,6 +48,13 @@ function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, r
     extra_layers = 2
     small_sz=ceil.(Int,sz./2) .+ extra_layers
     big_sz = small_sz .* 2  # size after upsampling
+    small_sz, big_sz = let 
+        if sz[3]==1
+            (small_sz[1:2]...,1), (big_sz[1:2]...,1)
+        else
+            small_sz, big_sz
+        end        
+    end
     if ~isnothing(sampling)
         amp_sampling = sampling .* big_sz ./ small_sz
     else
@@ -50,10 +65,23 @@ function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, r
         P1d = plan_fft(amp,(1,2), flags=pp.FFTPlan)
         P1id = plan_ifft(amp,(1,2), flags=pp.FFTPlan)
     end
-    border_in = (0,0,ceil.(Int,sz[3]./2) ./ small_sz[3],0)
+    border_in = (0,0, ceil.(Int,sz[3]./2) ./ small_sz[3],0)
     mywin = collect(window_hanning((1,1,small_sz[3],1), border_in=border_in, border_out=1)) # for speed reasons the collect is faster
-    amp = upsample2(amp .* mywin,dims=(1,2,3))
+    amp = let
+        if sz[3] == 1
+            upsample2(amp .* mywin,dims=(1,2))
+        else
+            upsample2(amp .* mywin,dims=(1,2,3))
+        end
+    end
     res = sum(abs2.(amp),dims=4)[:,:,:,1]
+    res = let
+        if is2d
+            dropdims(res, dims=3)
+        else
+            res
+        end
+    end
     if true # any(isodd.(sz))
         if return_amp
             return select_region_view(res,new_size=sz), amp

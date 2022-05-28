@@ -348,9 +348,11 @@ Arguments:
 + `sampling`: pixelpitch in real space as NTuple
 """
 function check_amp_sampling_z(sz, pp,sampling)
-    sample_factor = k_dz(pp) ./ ((sz[3] .÷2) .* k_scale(sz, pp, sampling)[3])
-    if (sample_factor > 1.0)
-        @warn "Your calculation is undersampled along Z by factors of $sample_factor. The PSF calculation will be incorrect.)"
+    if length(sz) > 2 && sz[3]>1
+        sample_factor = k_dz(pp) ./ ((sz[3] .÷2) .* k_scale(sz, pp, sampling)[3])
+        if (sample_factor > 1.0)
+            @warn "Your calculation is undersampled along Z by factors of $sample_factor. The PSF calculation will be incorrect.)"
+        end
     end
 end
 

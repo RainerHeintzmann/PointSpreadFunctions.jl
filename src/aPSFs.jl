@@ -169,7 +169,7 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
         end
         dst = @view slices[:,:,sz[3]:sz[3],:]
         select_region!(ift2d(pupil), dst, new_size=sz[1:2])
-    end
+    end        
     return slices
 end
 
@@ -178,9 +178,24 @@ function apsf(::Type{MethodPropagateIterative}, sz::NTuple, pp::PSFParams; sampl
         sampling = get_Ewald_sampling(sz, pp)
         print("Sampling is $sampling \n")
     end
+
+    sz, sampling, is2d = let 
+        if length(sz)>2
+            sz, sampling, false
+        else
+            (sz[1:2]...,1), (sampling[1:2]..., eps(eltype(sampling))), true
+        end
+    end
+
     check_amp_sampling(sz, pp, sampling)
     slices = apply_propagator_iteratively(sz, pp, sampling=sampling, center_kz=center_kz)
-    return slices # extract the central bit, which avoids the wrap-around effects
+
+    if is2d
+        return dropdims(slices,dims=3)
+    else
+        return slices # extract the central bit, which avoids the wrap-around effects
+    end
+
 end
 
 # just a different way of writing the propagation down
