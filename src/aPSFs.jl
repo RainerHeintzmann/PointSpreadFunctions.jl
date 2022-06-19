@@ -266,16 +266,25 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
     N = 50
     h = α / N # since these are really N+1 points
     I012 = zeros(Complex{pp.dtype}, (sr,sz[3],3)) # I0, I1 and I2
-    integrate!(I012, h/6*pp.aplanatic(0), 0) # first value
-    for n in 0:N-1 # integrate using Simpsons rule
-        theta = h*(n+0.5) # middle value(s)
-        integrate!(I012, 4*h/6*pp.aplanatic(theta), theta) # middle values count 4 times
-        if n<(N-1)
-            theta = h*(n+1)
-            integrate!(I012, 2*h/6*pp.aplanatic(theta), theta) # intermediate values (count twice in the sum)
+
+    aplanatic_fct = let
+        if pp.polarization == pol_scalar
+            (θ) -> pp.aplanatic(θ) ./ sqrt.(max.(cos.(θ),zero(typeof(θ))))
+        else
+            pp.aplanatic
         end
     end
-    integrate!(I012, h/6*pp.aplanatic(α), α) # last value
+
+    integrate!(I012, h/6*aplanatic_fct(0), 0) # first value
+    for n in 0:N-1 # integrate using Simpsons rule
+        theta = h*(n+0.5) # middle value(s)
+        integrate!(I012, 4*h/6*aplanatic_fct(theta), theta) # middle values count 4 times
+        if n<(N-1)
+            theta = h*(n+1)
+            integrate!(I012, 2*h/6*aplanatic_fct(theta), theta) # intermediate values (count twice in the sum)
+        end
+    end
+    integrate!(I012, h/6*aplanatic_fct(α), α) # last value
 
     # Interpolate the RZ-results onto the 3D grid
     phi = phiphi((sz[1],sz[2]), scale=(sampling[1],sampling[2]))
@@ -286,31 +295,40 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
     rpos = rr((sz[1],sz[2]), scale=(sampling[1],sampling[2]))
     r_idx = 1 .+ floor.(Int64, rpos ./ sampling_r) # index position
     w = 1.0 .- (rpos/ sampling_r .+ 1 .- r_idx) # index position
-    E = zeros(Complex{pp.dtype}, (sz...,3)) # I0, I1 and I2
+    numEl = let 
+        if pp.polarization == pol_scalar
+            1
+        else
+            3
+        end
+    end
+    E = zeros(Complex{pp.dtype}, (sz...,numEl)) # I0, I1 and I2
     for z = 1:sz[3]
         I0 = @view I012[:,z,1] # create views to be able to write by 1D indexing into the appropriate slices.
         I1 = @view I012[:,z,2]
         I2 = @view I012[:,z,3]
 
         if pp.polarization == pol_x
-            E[:,:,z,1] .= -im.*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
-            E[:,:,z,2] .= -im.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi
-            E[:,:,z,3] .= -2 .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*cosphi
+            E[:,:,z,1] .= ((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
+            E[:,:,z,2] .= (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi
+            E[:,:,z,3] .= 2im .* .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*cosphi
         elseif pp.polarization == pol_y
-            E[:,:,z,1] .= im.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi # sin2phi with pi/2 phase shift becomes -sin2phi
-            E[:,:,z,2] .= -im.*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).-cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])) # cos2phi becomes -cos2phi
-            E[:,:,z,3] .= 2 .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*sinphi # cosphi becomes -sinphi 
+            E[:,:,z,1] .= (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi # sin2phi with pi/2 phase shift becomes -sin2phi
+            E[:,:,z,2] .= ((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).-cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])) # cos2phi becomes -cos2phi
+            E[:,:,z,3] .= 2im .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*sinphi # cosphi becomes -sinphi 
         elseif pp.polarization == pol_circ # pol_x + im* pol_y
-            E[:,:,z,1] .= -im/sqrt(2).*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])) .-
-            1/sqrt(2)*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi 
-            E[:,:,z,2] .= -im/sqrt(2).*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi .+
-            1/sqrt(2)*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).-cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
-            E[:,:,z,3] .= 1/sqrt(2)*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*(-2 .*cosphi .+ 2im * sinphi)
+            E[:,:,z,1] .= 1/sqrt(2).*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])) .+
+            im/sqrt(2)*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi 
+            E[:,:,z,2] .= 1/sqrt(2).*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi .+
+            im/sqrt(2)*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).-cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
+            E[:,:,z,3] .= 2im/sqrt(2)*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*(cosphi .+ im * sinphi)
+        elseif pp.polarization == pol_scalar # scalar approximation
+            E[:,:,z,1] .=  (w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]) # .+ (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]) .+ 1 .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1])
         else
             error("unsupported polarization for Richards-Wolf method")
         end
     end
-    return E
+    return E .* 1.14 # no idea why this scaling is needed
 end
 
 """
