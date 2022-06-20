@@ -29,7 +29,7 @@ function compare_asfs(sz, pp, sampling)
     # mz = size(a_prop2,3)÷2+1; @vt ft2d(a_prop2) ft2d(a_iter) ft2d(a_sincR) ft2d(a_prop) ft2d(a_shell) ft2d(a_RW)
 end
 
-@testset "Compare scalar aPSFs" begin
+@testset "Compare various aPSFs" begin
     pp = PSFParams(pol=pol_scalar)
     compare_asfs(sz, pp, sampling)
     pp = PSFParams(pol=pol_circ)
@@ -38,14 +38,6 @@ end
     compare_asfs(sz, pp, sampling)
     pp = PSFParams(pol=pol_y)
     compare_asfs(sz, pp, sampling)
-end
-
-pp = PSFParams(pol=pol_x)
-sz = (128,128,128)
-sampling=(0.100,0.100,0.150)
-
-@testset "Compare x-pol aPSFs" begin
-    compare_psfs(sz, pp, sampling)
 end
 
 ct = sz[1].÷2+1
