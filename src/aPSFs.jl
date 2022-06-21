@@ -10,7 +10,7 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
     # The big_sz is used to avoid interference effects by the application of the multiplication with the pupil maks in Fourier space
     # The size if 4/3 is such that the diagonals are covered but a wrap-around into the original size is avoided.
     # big_sz = ((sz[1:2].*2)...,sz[3]+2)  # The 2 extra slices in z seem to be necessary to avoid a problem at the fist position
-    big_sz = ((sz[1:2].*2)...,sz[3]+4)  # The 2 extra slices in z seem to be necessary to avoid a problem at the fist positions
+    big_sz = (ceil.(Int, sz[1:2].*2.1)...,sz[3]+4)  # The 2 extra slices in z seem to be necessary to avoid a problem at the fist positions
 
     if undersampling_factor > 1.0 # the current sampling is insufficient for the SincR method. We need to properly sample the Ewald sphere.
         # the size sz[3] will be cut out in Fourier-spage around the cleaned and processed part of the McCutchen pupil, which should yield the sampling as currently specified.
@@ -23,7 +23,7 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
 
     pupil = pupil_xyz(nowrap_sz, pp, big_sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
     sinc_r_big = sinc_r(nowrap_sz,pp, sampling=big_sampling) .* my_disc(nowrap_sz[1:2],pp)  # maybe this should rather already be apodized by angle?
-    if pp.FFTPlan != nothing
+    if !isnothing(pp.FFTPlan) 
         P3d = plan_fft(sinc_r_big, flags=pp.FFTPlan)
     end
 
@@ -45,7 +45,7 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
     # check_amp_sampling_sincr(nowrap_sz, pp, sampling)
     # print("Amplitude sampling is $sampling \n")
     pupils = (cos.(pupil_θ(nowrap_sz,pp,sampling)) .* pupil) .* iftz(shell)
-    if pp.FFTPlan != nothing
+    if !isnothing(pp.FFTPlan) 
         Pm2d = plan_fft(pupils,(1,2), flags=pp.FFTPlan)
     end
 
@@ -95,6 +95,7 @@ function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothi
         print("Sampling is $sampling \n")
     end
     check_amp_sampling(sz, pp, sampling)
+    # the pupil below is the ft of a jinc in real space and includes a factor of my_disc(sz[1:2],pp) to reduce wrap around
     pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
     pupils = apply_propagators(pupil, sz[3], pp, sampling=sampling)
     # return pupils
@@ -103,7 +104,7 @@ function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothi
         _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling)
         pupils .*= cispi.((-2*rel_kz/sz[3]) .* zz((1,1,sz[3]))) # centers the McCutchen pupil to be able to correctly resample it along kz
     end
-    if pp.FFTPlan != nothing
+    if !isnothing(pp.FFTPlan)
         Pm2d = plan_fft(pupils,(1,2), flags=pp.FFTPlan)
     end
     res=ift2d(pupils) # This should really be a zoomed iFFT
@@ -135,10 +136,10 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
     # real_window = window_gaussian(size(start_pupil)[1:2], border_in=border_in,border_out=border_in.*0.5 .+ 0.5)  # This is maybe not the best PML?
     # real_window = window_hanning(size(start_pupil)[1:2],border_in=border_in,border_out=1)
     prop_pupil = conj(prop_pupil) # from now the advancement is in the opposite direction
-    if pp.FFTPlan !== nothing
+    if !isnothing(pp.FFTPlan) 
         P2d = plan_fft(pupil,(1,2), flags=pp.FFTPlan)
     end
-    if pp.FFTPlan !== nothing
+    if !isnothing(pp.FFTPlan)
         Pi2d = plan_ifft(pupil,(1,2), flags=pp.FFTPlan)
     end
     pupil = start_pupil
