@@ -161,6 +161,7 @@ end
     jinc_r_2d(sz::NTuple, pp::PSFParams; sampling=nothing)
 
 calculates a jinc(abs(position)) function in 2D such that its Fourier transform corresponds to the disk-shaped pupil (indcluding the effect ot the numerical aperture).
+If `sampling` is not provided, sampling is assumed such that the Nyquist sampling would correspond to sampling the wavelength (i.e. the Ewals sphere) correctly for this amplitude.
 
 See also:
 + sinc_r()
@@ -171,6 +172,20 @@ function jinc_r_2d(sz::NTuple, pp::PSFParams; sampling=nothing)
         sampling=get_Ewald_sampling(sz, pp)
     end 
     jinc.(rr(pp.dtype, sz[1:2], scale=2 .*sampling[1:2] ./ (pp.λ./pp.NA)))
+end
+
+"""
+    jinc_r_2d(sz::NTuple, diameter=(1.0,1.0), dtype=Float32)
+
+calculates a jinc(abs(position)) function in 2D such that its Fourier transform corresponds to the disk-shaped pupil of `diameter` which is a Tuple of both long axes diameters.
+`dtype` specifies the destination type.
+
+See also:
++ sinc_r()
+
+"""
+function jinc_r_2d(sz::NTuple, diameter=(1.0,1.0), dtype=Float32)
+    jinc.(rr(dtype, sz[1:2], scale=diameter./sz[1:2]))
 end
 
 # my_disc(sz; rel_border=4/3, eps=0.05) = window_hanning(sz, border_in=rel_border.-eps, border_out=rel_border.+eps)

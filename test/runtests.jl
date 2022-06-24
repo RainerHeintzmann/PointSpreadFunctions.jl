@@ -56,4 +56,22 @@ pb = 86
     @test abs(pupil[pb,ct,1,3]) > 1
 end
 
+@testset "confocal PSF" begin
+    sampling = (0.045,0.045,0.080)
+    sz = (64,64,32)
+    pp_em = PSFParams(0.5,1.3,1.52; mode=ModeConfocal);
+    pp_ex = PSFParams(pp_em; λ=0.488);
+    pinhole = 0.001
+    pc = psf(sz,pp_em; pp_ex=pp_ex, pinhole=pinhole, sampling=sampling);
+
+    pp_em = PSFParams(0.5,1.3,1.52; mode=ModeWidefield);
+    pw_em = psf(sz,pp_em; sampling=sampling);
+    pp_ex = PSFParams(pp_em; λ=0.488);
+    pw_ex = psf(sz,pp_ex; sampling=sampling);
+    pc2 = pw_ex .* pw_em
+    # check if the confocal calculations agree for a very small pinhole
+    @test isapprox(pc ./ sum(pc), pc2./sum(pc2); rtol=0.0001)
+    @test isapprox(pc ./ maximum(pc), pc2./maximum(pc2); rtol=0.0001)
+end
+
 return

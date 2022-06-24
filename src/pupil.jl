@@ -74,14 +74,14 @@ end
 
 creates a pupil with electric field distributions in XYZ. Returns a 4D dataset with the electric field components along the 4th dimension.
 """
-function pupil_xyz(sz, pp, sampling=nothing)
+function pupil_xyz(sz, pp, sampling=nothing; is_proj=true)
     if isnothing(sampling)
         sampling = get_Ewald_sampling(sz, pp)
     end
     if isnothing(pp.aberrations) || isempty(pp.aberrations.indices)
-        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling, is_proj=true) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
+        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling, is_proj=is_proj) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
     else
-        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling, is_proj=true) .* get_zernike_pupil(sz, pp, sampling) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
+        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling, is_proj=is_proj) .* get_zernike_pupil(sz, pp, sampling) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
     end
 end
 

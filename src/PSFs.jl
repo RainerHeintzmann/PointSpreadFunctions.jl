@@ -13,22 +13,22 @@ include("pupil.jl")
 include("aPSFs.jl")
 
 """
-    psf(sz::NTuple, pp::PSFParams; sampling=get_sampling(sz, pp))
+    psf(::Type{ModeWidefield}, sz::NTuple, pp::PSFParams; sampling=get_sampling(sz, pp))
 
-calculates the point spread function (psf), i.e. the image of a single (very small) emitter. Most of the parameters
+calculates the widefield single-frequency point spread function (psf), i.e. the image of a single (very small) emitter. Most of the parameters
 (such as refractive index, numerical aperture, vacuum wavelength, aberrations etc.) are hidden in the parameter structure argument `pp`,
 which should be generated via the `PSFParams()` constructor. See ``PSFParams()` for details.
 
 See also:
-+ apsf():  calculates the underlying aplitude point spread function (apsf)
++ apsf():  calculates the underlying amplitude point spread function (apsf)
 
 Example:
 ```jdoctest
 julia> pp = PSFParams(500.0,1.4,1.52);
-julia> p = psf((128,128,128),pp; sampling=(50,50,100)); #; 
+julia> p = psf((128,128,128),pp; sampling=(50,50,100));
 ```
 """
-function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, return_amp=false) # unclear why the resampling seems to be so bad
+function psf(::Type{ModeWidefield}, sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, return_amp=false) # unclear why the resampling seems to be so bad
     sz, sampling, is2d = let 
         if length(sz)>2
             sz, sampling, false
@@ -61,7 +61,7 @@ function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, r
         amp_sampling = nothing
     end
     amp = apsf(small_sz, pp, sampling=amp_sampling, center_kz=true)
-    if pp.FFTPlan != nothing
+    if !isnothing(pp.FFTPlan)
         P1d = plan_fft(amp,(1,2), flags=pp.FFTPlan)
         P1id = plan_ifft(amp,(1,2), flags=pp.FFTPlan)
     end
@@ -95,6 +95,72 @@ function psf(sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, r
             return res
         end
     end
+end
+
+"""
+    psf(::Type{ModeConfocal}, sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, return_amp=false) # unclear why the resampling seems to be so bad
+    Calculates a confocal point spread function.
+    
+```jdoctest
+julia> pp_em = PSFParams(500.0,1.4,1.52; mode=ModeConfocal);
+julia> pp_ex = PSFParams(pp_em; λ=0.488);
+julia> p = psf((128,128,128),pp; pp_ex=pp_ex, pinhole=1.0, sampling=(50,50,100));
+```
+"""
+function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, pinhole=nothing, sampling=nothing, use_resampling=true, return_amp=nothing) # unclear why the resampling seems to be so bad
+    if isnothing(pp_ex) 
+        error("The named parameter `pp_ex` is obligatory for confocal calculation. Provide the excitation PSF parameters here.")
+    end
+    if isnothing(pinhole)
+        error("The named parameter `pinhole` is obligatory for confocal calculation. Provide the excitation PSF parameters here.")
+    end
+    if !isnothing(return_amp) || return_amp == true
+        error("A confocal PSF cannot return an amplitude. Please use `return_amp=false`.")
+    end
+    #ToDo: implement the use_resampling also for the confocal by undersampling the widefield PSFs and upsampling the result. 
+    # Implement: coarse_calc_upsample_cut(sz, sampling, fct) and use it in all the functions that utilize this trick
+
+    # creat a pseudo parameter structure with the combined wavelength just to check the individual amplitude samplings of the final result.
+    λeff = 1 / (1/pp_ex.λ + 1/pp_em.λ)
+    pp_both = PSFParams(pp_em; λ= λeff)
+    # the factor of two below, is since the amp psf can be twice undersampled, but the intensity psf not.
+    check_amp_sampling(sz, pp_both, sampling .* 2.0)
+
+    psf_ex = psf(ModeWidefield, sz, pp_ex; sampling=sampling, use_resampling=use_resampling)
+    # pp_em = PSFParams(pp, mode = ModeWidefield)
+    psf_em = psf(ModeWidefield, sz, pp_em; sampling=sampling, use_resampling=use_resampling)
+
+    # now we need to modify the sampling such that the pinhole corrsponds to the equivalent of one Airy Unit.
+    # The Airy Unit is the diameter of the Airy disc: 1.22 * lamda_em / NA 
+    AU = 1.22 * pp_em.λ / pp_em.NA
+    AU_pix = AU ./ sampling[1:2]
+    # This can be done a lot more efficiently by staying in Fourier space. Ideally even by only calculating half the range of the jinc function:
+    pinhole = real.(ift2d(jinc_r_2d(sz, pinhole .* AU_pix, pp_em.dtype)))
+    pinhole_ft = rfft2d(ifftshift(pinhole))
+    # return pinhole, pinhole_ft
+    my_em = irfft2d(rfft2d(psf_em) .* pinhole_ft, sz[1])
+    return my_em .* psf_ex
+end
+
+"""
+    psf(sz::NTuple, pp::PSFParams; sampling=get_sampling(sz, pp))
+
+calculates the point spread function (psf), i.e. the image of a single (very small) emitter. Most of the parameters
+(such as refractive index, numerical aperture, vacuum wavelength, aberrations etc.) are hidden in the parameter structure argument `pp`,
+which should be generated via the `PSFParams()` constructor. See ``PSFParams()` for details.
+Note that the field `pp.mode` defines the microscopic mode to simulate. Currently implemented are the default `ModeWidefield` and `ModeConfocal`.
+
+See also:
++ apsf():  calculates the underlying amplitude point spread function (apsf)
+
+Example:
+```jdoctest
+julia> pp = PSFParams(500.0,1.4,1.52);
+julia> p = psf((128,128,128),pp; sampling=(50,50,100));
+```
+"""
+function psf(sz::NTuple, pp::PSFParams; nps...) # unclear why the resampling seems to be so bad
+    return psf(pp.mode, sz, pp; nps...)
 end
 
 end # module

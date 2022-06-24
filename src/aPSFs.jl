@@ -1,3 +1,14 @@
+"""
+    apsf(::Type{MethodParaxial}, sz::NTuple, pp::PSFParams; sampling=nothing) 
+    Calculates a paraxial amplitude PSF. Typically `pp.polarization` should be `pol_scalar`. However, other polarisation types yield two channels in the 4th dimension.
+    One for X and one for Y polarisation. In the paraxial approximation there is no Z polarisation.
+"""
+function apsf(::Type{MethodParaxial}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
+    # yields a scalar psf
+    # res = jinc_r_2d(sz, pp;sampling=sampling) .* field_pupil(sz, pp, sampling)
+    error("The paraxial approximation for 3D PSF has not yet been implemented. For a 2D psf please use jinc_r_2d(sz, pp;sampling=sampling) .* field_pupil(sz, pp, sampling)")
+    res
+end
 
 function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
     check_amp_sampling(sz, pp, sampling)
@@ -21,7 +32,8 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
         big_sampling = sampling
     end
 
-    pupil = pupil_xyz(nowrap_sz, pp, big_sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
+    # the pupil below does not need the 1/cos(theta) factor, since this is already in the 3D shell.
+    pupil = pupil_xyz(nowrap_sz, pp, big_sampling, is_proj=false) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
     sinc_r_big = sinc_r(nowrap_sz,pp, sampling=big_sampling) .* my_disc(nowrap_sz[1:2],pp)  # maybe this should rather already be apodized by angle?
     if !isnothing(pp.FFTPlan) 
         P3d = plan_fft(sinc_r_big, flags=pp.FFTPlan)
@@ -44,7 +56,8 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
 
     # check_amp_sampling_sincr(nowrap_sz, pp, sampling)
     # print("Amplitude sampling is $sampling \n")
-    pupils = (cos.(pupil_θ(nowrap_sz,pp,sampling)) .* pupil) .* iftz(shell)
+    # pupils = (cos.(pupil_θ(nowrap_sz,pp,sampling)) .* pupil) .* iftz(shell)
+    pupils = pupil .* iftz(shell)
     if !isnothing(pp.FFTPlan) 
         Pm2d = plan_fft(pupils,(1,2), flags=pp.FFTPlan)
     end
