@@ -31,13 +31,37 @@ julia> pp = PSFParams(580.0, 1.4, 1.518)
 PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodPropagateIterative, nothing, Aberrations(Any[], Any[], :OSA), nothing)
 
 julia> PSFs.get_Abbe_limit(pp)
-(191.04085f0, 191.04085f0, 234.38591f0)
+(191.04085f0, 191.04085f0, 622.8464f0)
 ```
 """
 function get_Abbe_limit(pp::PSFParams)
     d_xy = pp.λ ./ (2 .* pp.n) 
-    d_z = (1 - cos(asin(pp.NA/ pp.n))) * pp.λ / pp.n
+    d_z =  pp.λ / (pp.n * (1 - cos(asin(pp.NA/ pp.n))))
     pp.dtype.((d_xy,d_xy,d_z))
+end
+
+"""
+    get_Nyquist_limit(pp::PSFParams)
+
+returns the Nyquist sampling limit of incoherent imaging in real space as a Tuple with 3 entries. Note that the coherent limit needs only a factor of
+two less sampling, as long as no intensity is calculated. This allows upsampling right before calculating intensities.
+
+See also:
++ get_Abbe_limit()
+
+Example:
+```jdoctest
+julia> using PSFs
+
+julia> pp = PSFParams(580.0, 1.4, 1.518)
+PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodPropagateIterative, nothing, Aberrations(Any[], Any[], :OSA), nothing)
+
+julia> PSFs.get_Nyquist_limit(pp)
+(95.520424f0, 95.520424f0, 311.4232f0)
+```
+"""
+function get_Nyquist_limit(pp::PSFParams)
+    get_Abbe_limit(pp) ./ 2
 end
 
 """
@@ -137,6 +161,7 @@ end
     jinc_r_2d(sz::NTuple, pp::PSFParams; sampling=nothing)
 
 calculates a jinc(abs(position)) function in 2D such that its Fourier transform corresponds to the disk-shaped pupil (indcluding the effect ot the numerical aperture).
+If `sampling` is not provided, sampling is assumed such that the Nyquist sampling would correspond to sampling the wavelength (i.e. the Ewals sphere) correctly for this amplitude.
 
 See also:
 + sinc_r()
@@ -147,6 +172,43 @@ function jinc_r_2d(sz::NTuple, pp::PSFParams; sampling=nothing)
         sampling=get_Ewald_sampling(sz, pp)
     end 
     jinc.(rr(pp.dtype, sz[1:2], scale=2 .*sampling[1:2] ./ (pp.λ./pp.NA)))
+end
+
+"""
+    jinc_r_2d(sz::NTuple, diameter=(1.0,1.0), dtype=Float32)
+
+calculates a jinc(abs(position)) function in 2D such that its Fourier transform corresponds to the disk-shaped pupil of `diameter` which is a Tuple of both long axes diameters.
+`dtype` specifies the destination type. Note that the result is normalized such that the disk as obtained by an inverse Fourier transformation is filled with a value of `1.0`.
+
+See also:
++ sinc_r()
+
+# Example
+```jdoctest
+julia> using PSFs, View5D
+
+julia> sz = (100,100);d=20.0; w=jinc_r_2d(sz,d); 
+
+julia> q = jinc_r_2d(sz, d; r_func=PSFs.rr_rfft); # a version in RFFT space
+
+julia> @vt rr(sz) .< d/2.0 real.(ift(w)) fftshift(irfft(q,sz[1]))
+```
+"""
+function jinc_r_2d(sz::NTuple, diameter=(1.0,1.0), dtype=Float32; r_func=rr)
+    diameter = (1,1) .* diameter
+    scale = diameter./sz[1:2]
+    sfac = (pi/4).*prod(diameter)
+    sfac .* jinc.(r_func(dtype, sz[1:2], scale=scale))
+end
+
+"""
+    rr_rfft(dtype, sz; scale=1.0)
+    generates the positions in rfft space based on the distance to the zero coordinate. `sz` corresponds to a size of the full (inverse Fourier-transformed) array.
+
+"""
+function rr_rfft(dtype, sz; scale=1.0)
+    sz = Tuple((d==1 ? sz[d].÷2+1 : sz[d] for d=1:length(sz)))
+    ifftshift(rr(dtype, sz, offset=CtrRFT, scale=scale), (2:length(sz)))
 end
 
 # my_disc(sz; rel_border=4/3, eps=0.05) = window_hanning(sz, border_in=rel_border.-eps, border_out=rel_border.+eps)
@@ -324,9 +386,11 @@ Arguments:
 + `sampling`: pixelpitch in real space as NTuple
 """
 function check_amp_sampling_z(sz, pp,sampling)
-    sample_factor = k_dz(pp) ./ ((sz[3] .÷2) .* k_scale(sz, pp, sampling)[3])
-    if (sample_factor > 1.0)
-        @warn "Your calculation is undersampled along Z by factors of $sample_factor. The PSF calculation will be incorrect.)"
+    if length(sz) > 2 && sz[3]>1
+        sample_factor = k_dz(pp) ./ ((sz[3] .÷2) .* k_scale(sz, pp, sampling)[3]) ./ 2
+        if (sample_factor > 1.0)
+            @warn "Your calculation is undersampled along Z by factors of $sample_factor. The PSF calculation will be incorrect.)"
+        end
     end
 end
 
@@ -376,3 +440,80 @@ function check_amp_sampling_sincr(sz, pp,sampling) # The sinc-r method needs (fo
     end
 end
 
+"""
+    normalize_amp_to_plane(apsf, plane=nothing, mydim=4)
+
+normalizes an amplitude PSF such that the intensity sum over the `plane` position along dimension `mydim`
+"""
+function normalize_amp_to_plane(apsf, plane=nothing, mydim=3)
+    plane = isnothing(plane) ?  size(apsf,mydim)÷2+1 : plane = plane
+    mysumI = sum(abs2.(slice(apsf, mydim, plane)))
+    return apsf ./ sqrt(mysumI)
+end
+
+"""
+    calc_with_resampling(fct, sz, sampling, args)
+    calculates a function `fct` on a twice downsampled grid and upsamples the result.
+#Parameters
++`fct`:  Function that performs the calculation. Its first argument needs to be the N-dimensional data size `sz` and the `sampling`.
++`sz`:  size of the array to calculate
++`sampling`: pixel sizes of the final array to calculate
++ `norm_amp`:  decides whether amplitude or intensity is normalized to account for the size change
+
+"""
+function calc_with_resampling(fct, sz, sampling; norm_amp=true)
+    # ensure that the data is at least 3D
+    sz, sampling, is2d = let 
+        if length(sz)>2
+            sz, sampling, false
+        else
+            (sz[1:2]...,1), (sampling[1:2]..., eps(eltype(sampling))), true
+        end
+    end
+
+    extra_layers = 2
+    # size to first calculate in
+    small_sz=ceil.(Int,sz./2) .+ extra_layers
+    # size after upsampling
+    big_sz = small_sz .* 2  
+    small_sz, big_sz = let 
+        if sz[3]==1
+            (small_sz[1:2]...,1), (big_sz[1:2]...,1)
+        else
+            small_sz, big_sz
+        end        
+    end
+
+    small_sampling = let
+        if ~isnothing(sampling)
+            sampling .* big_sz ./ small_sz
+        else
+            nothing
+        end
+    end
+
+    res_small = fct(small_sz, small_sampling)
+    border_in = (0,0, ceil.(Int,sz[3]./2) ./ small_sz[3],0)
+    mywin = collect(window_hanning((1,1,small_sz[3],1), border_in=border_in, border_out=1)) # for speed reasons the collect is faster
+
+    # Note that the upsampling leads to a one-pixel shift of the center for each odd-size dimension
+    # This is taken care of in the select_region code below
+    res = upsample2(res_small .* mywin, fix_center=true, keep_singleton=true)
+    res = let
+        if is2d
+            dropdims(res, dims=3)
+        else
+            res
+        end
+    end
+    # account for the brightness change during rescaling. Only the lateral sizes matter.
+    scale = let 
+        if norm_amp
+           sqrt(prod(size(res_small)[1:2]) / prod(size(res)[1:2]))
+        else
+           prod(size(res_small)[1:2]) / prod(size(res)[1:2])
+        end        
+    end
+    # select the appropriate wanted size
+    return select_region_view(res, new_size=sz) .* scale
+end

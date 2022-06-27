@@ -1,3 +1,14 @@
+"""
+    apsf(::Type{MethodParaxial}, sz::NTuple, pp::PSFParams; sampling=nothing) 
+    Calculates a paraxial amplitude PSF. Typically `pp.polarization` should be `pol_scalar`. However, other polarisation types yield two channels in the 4th dimension.
+    One for X and one for Y polarisation. In the paraxial approximation there is no Z polarisation.
+"""
+function apsf(::Type{MethodParaxial}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
+    # yields a scalar psf
+    # res = jinc_r_2d(sz, pp;sampling=sampling) .* field_pupil(sz, pp, sampling)
+    error("The paraxial approximation for 3D PSF has not yet been implemented. For a 2D psf please use jinc_r_2d(sz, pp;sampling=sampling) .* field_pupil(sz, pp, sampling)")
+    res
+end
 
 function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
     check_amp_sampling(sz, pp, sampling)
@@ -10,7 +21,7 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
     # The big_sz is used to avoid interference effects by the application of the multiplication with the pupil maks in Fourier space
     # The size if 4/3 is such that the diagonals are covered but a wrap-around into the original size is avoided.
     # big_sz = ((sz[1:2].*2)...,sz[3]+2)  # The 2 extra slices in z seem to be necessary to avoid a problem at the fist position
-    big_sz = ((sz[1:2].*2)...,sz[3]+4)  # The 2 extra slices in z seem to be necessary to avoid a problem at the fist positions
+    big_sz = (ceil.(Int, sz[1:2].*2.1)...,sz[3]+4)  # The 2 extra slices in z seem to be necessary to avoid a problem at the fist positions
 
     if undersampling_factor > 1.0 # the current sampling is insufficient for the SincR method. We need to properly sample the Ewald sphere.
         # the size sz[3] will be cut out in Fourier-spage around the cleaned and processed part of the McCutchen pupil, which should yield the sampling as currently specified.
@@ -21,9 +32,10 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
         big_sampling = sampling
     end
 
-    pupil = pupil_xyz(nowrap_sz, pp, big_sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
+    # the pupil below does not need the 1/cos(theta) factor, since this is already in the 3D shell.
+    pupil = pupil_xyz(nowrap_sz, pp, big_sampling, is_proj=false) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
     sinc_r_big = sinc_r(nowrap_sz,pp, sampling=big_sampling) .* my_disc(nowrap_sz[1:2],pp)  # maybe this should rather already be apodized by angle?
-    if pp.FFTPlan != nothing
+    if !isnothing(pp.FFTPlan) 
         P3d = plan_fft(sinc_r_big, flags=pp.FFTPlan)
     end
 
@@ -44,13 +56,15 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
 
     # check_amp_sampling_sincr(nowrap_sz, pp, sampling)
     # print("Amplitude sampling is $sampling \n")
-    pupils = (cos.(pupil_θ(nowrap_sz,pp,sampling)) .* pupil) .* iftz(shell)
-    if pp.FFTPlan != nothing
+    # pupils = (cos.(pupil_θ(nowrap_sz,pp,sampling)) .* pupil) .* iftz(shell)
+    pupils = pupil .* iftz(shell)
+    if !isnothing(pp.FFTPlan) 
         Pm2d = plan_fft(pupils,(1,2), flags=pp.FFTPlan)
     end
 
     res=ift2d(pupils) # This should really be a zoomed iFFT
-    return select_region(res, new_size=sz[1:3]) # extract the central bit, which avoids the wrap-around effects
+    # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
+    return normalize_amp_to_plane(select_region(res, new_size=sz[1:3])) # extract the central bit, which avoids the wrap-around effects
     # , sampling
 end
 
@@ -95,6 +109,7 @@ function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothi
         print("Sampling is $sampling \n")
     end
     check_amp_sampling(sz, pp, sampling)
+    # the pupil below is the ft of a jinc in real space and includes a factor of my_disc(sz[1:2],pp) to reduce wrap around
     pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
     pupils = apply_propagators(pupil, sz[3], pp, sampling=sampling)
     # return pupils
@@ -103,11 +118,12 @@ function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothi
         _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling)
         pupils .*= cispi.((-2*rel_kz/sz[3]) .* zz((1,1,sz[3]))) # centers the McCutchen pupil to be able to correctly resample it along kz
     end
-    if pp.FFTPlan != nothing
+    if !isnothing(pp.FFTPlan)
         Pm2d = plan_fft(pupils,(1,2), flags=pp.FFTPlan)
     end
     res=ift2d(pupils) # This should really be a zoomed iFFT
-    return res # extract the central bit, which avoids the wrap-around effects
+     # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
+     return normalize_amp_to_plane(res) # extract the central bit, which avoids the wrap-around effects
 end
 
 # This function is needed for the propagate method, but iterates between real and Fourier space always smoothly deleting "out-of-bound" waves.
@@ -135,10 +151,10 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
     # real_window = window_gaussian(size(start_pupil)[1:2], border_in=border_in,border_out=border_in.*0.5 .+ 0.5)  # This is maybe not the best PML?
     # real_window = window_hanning(size(start_pupil)[1:2],border_in=border_in,border_out=1)
     prop_pupil = conj(prop_pupil) # from now the advancement is in the opposite direction
-    if pp.FFTPlan !== nothing
+    if !isnothing(pp.FFTPlan) 
         P2d = plan_fft(pupil,(1,2), flags=pp.FFTPlan)
     end
-    if pp.FFTPlan !== nothing
+    if !isnothing(pp.FFTPlan)
         Pi2d = plan_ifft(pupil,(1,2), flags=pp.FFTPlan)
     end
     pupil = start_pupil
@@ -152,9 +168,11 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
     dst = @view slices[:,:,1:1,:]
     select_region!(ift2d(pupil), dst, new_size=sz[1:2])
 
-    if has_z_symmetry(pp) # to save some speed
+    # the check below is disabled for now, since there needs to be also an XY-flip to be correct
+    if false # has_z_symmetry(pp) # to save some speed
         dz = sz[3] - (start_z+1)
-        slices[:,:,start_z+1:start_z+1+dz,:] .= conj(slices[:,:,start_z-1:-1:start_z-1-dz,:]);
+        # missing XY-flip:
+        slices[:,:,start_z+1:start_z+1+dz,:] .= conj.(slices[:,:,start_z-1:-1:start_z-1-dz,:]);
     else
         prop_pupil = conj(prop_pupil) # from now the advancement is in the opposite direction
         pupil = start_pupil .* prop_pupil
@@ -167,7 +185,7 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
         end
         dst = @view slices[:,:,sz[3]:sz[3],:]
         select_region!(ift2d(pupil), dst, new_size=sz[1:2])
-    end
+    end        
     return slices
 end
 
@@ -176,9 +194,25 @@ function apsf(::Type{MethodPropagateIterative}, sz::NTuple, pp::PSFParams; sampl
         sampling = get_Ewald_sampling(sz, pp)
         print("Sampling is $sampling \n")
     end
+
+    sz, sampling, is2d = let 
+        if length(sz)>2
+            sz, sampling, false
+        else
+            (sz[1:2]...,1), (sampling[1:2]..., eps(eltype(sampling))), true
+        end
+    end
+
     check_amp_sampling(sz, pp, sampling)
-    slices = apply_propagator_iteratively(sz, pp, sampling=sampling, center_kz=center_kz)
-    return slices # extract the central bit, which avoids the wrap-around effects
+     # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
+     slices = normalize_amp_to_plane(apply_propagator_iteratively(sz, pp, sampling=sampling, center_kz=center_kz))
+
+    if is2d
+        return dropdims(slices,dims=3)
+    else
+        return slices # extract the central bit, which avoids the wrap-around effects
+    end
+
 end
 
 # just a different way of writing the propagation down
@@ -208,17 +242,32 @@ function apsf(::Type{MethodShell}, sz::NTuple, pp::PSFParams; sampling=nothing, 
 
     pupils = apply_kz_to_pupil(pupil, sz[3], pp, sampling=sampling)    
     res=ift2d(pupils) # This should really be a zoomed iFFT
-    return res # extract the central bit, which avoids the wrap-around effects
+     # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
+    return normalize_amp_to_plane(res) # extract the central bit, which avoids the wrap-around effects
 end
 
+function simpson!(f,α,N=80)
+    h = α / N # N+1 points are really used...
+    I012 = h/6*f(0) # middle values count 4 times
+    for n in 0:N-1 # integrate using Simpsons rule
+        theta = h*(n+0.5) # middle value(s)
+        I012 += 4*h/6*f(theta) # middle values count 4 times
+        if n<(N-1)
+            theta = h*(n+1)
+            I012 += 2*h/6*f(theta) # intermediate values (count twice in the sum)
+        end
+    end
+    I012 += h/6*f(α) # last value
+    return I012
+end
 
 # Calculates I0, I1 and I2 according to the Richards and Wolf paper
 # The calculation is done on an RZ plane and then interpolated to a 3D volume.
 # This is probably still buggy! At least the Pupil aplanatic factor looks wrong!
 function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
-    @show sampling_r = min(sampling[1],sampling[2])/2.0
+    sampling_r = min(sampling[1],sampling[2])/2.0
     diagonal = sqrt(sum(abs2.(sz[1:2] .* sampling[1:2]))) / 2.0;
-    @show sr = ceil(Int64, diagonal/sampling_r) + 1
+    sr = ceil(Int64, diagonal/sampling_r) + 1
     r = xx((sr,), scale=sampling_r, offset=CtrCorner) # a generator for radius
     k = 2pi / (pp.λ / pp.n);
     kz = yy((1,sz[3]), scale=k*sampling[3])
@@ -232,40 +281,73 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
     end
     α = asin(pp.NA / pp.n); # maximal aperture angle
     # Now perform the integration according to Simpsons rule
-    N = 80
+    N = 50
+    h = α / N # since these are really N+1 points
     I012 = zeros(Complex{pp.dtype}, (sr,sz[3],3)) # I0, I1 and I2
-    h = α / N
-    for n in 0:N-1 # integrate using Simpsons rule
-        theta = h*n
-        apl = pp.aplanatic(theta)
-        if n==1 || n==N-1
-            integrate!(I012, h/6*apl, theta) # first value
+
+    aplanatic_fct = let
+        if pp.polarization == pol_scalar
+            (θ) -> pp.aplanatic(θ) ./ sqrt.(max.(cos.(θ),zero(typeof(θ))))
         else
-            integrate!(I012, 2*h/6*apl, theta) # intermediate values (count twice in the sum)
+            pp.aplanatic
         end
-        theta = h*(n+0.5) # middle value(s)
-        integrate!(I012, 4*h/6*apl, theta) # middle values count 4 times
     end
-    integrate!(I012, h/6, α*pp.aplanatic(α)) # last value
+
+    integrate!(I012, h/6*aplanatic_fct(0.0), 0.0) # first value
+    for n in 0:N-1 # integrate using Simpsons rule
+        theta = h*(n+0.5) # middle value(s)
+        integrate!(I012, 4*h/6*aplanatic_fct(theta), theta) # middle values count 4 times
+        if n<(N-1)
+            theta = h*(n+1)
+            integrate!(I012, 2*h/6*aplanatic_fct(theta), theta) # intermediate values (count twice in the sum)
+        end
+    end
+    integrate!(I012, h/6*aplanatic_fct(α), α) # last value
 
     # Interpolate the RZ-results onto the 3D grid
     phi = phiphi((sz[1],sz[2]), scale=(sampling[1],sampling[2]))
-    rpos = rr((sz[1],sz[2]), scale=(sampling[1],sampling[2]))
+    sinphi = sin.(phi)
     cosphi = cos.(phi)
     cos2phi = cos.(2 .*phi)
     sin2phi = sin.(2 .*phi)
+    rpos = rr((sz[1],sz[2]), scale=(sampling[1],sampling[2]))
     r_idx = 1 .+ floor.(Int64, rpos ./ sampling_r) # index position
     w = 1.0 .- (rpos/ sampling_r .+ 1 .- r_idx) # index position
-    E = zeros(Complex{pp.dtype}, (sz...,3)) # I0, I1 and I2
+    numEl = let 
+        if pp.polarization == pol_scalar
+            1
+        else
+            3
+        end
+    end
+    E = zeros(Complex{pp.dtype}, (sz...,numEl)) # I0, I1 and I2
     for z = 1:sz[3]
-        I0 = @view I012[:,z,1]
+        I0 = @view I012[:,z,1] # create views to be able to write by 1D indexing into the appropriate slices.
         I1 = @view I012[:,z,2]
         I2 = @view I012[:,z,3]
-        E[:,:,z,1] .= -im.*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
-        E[:,:,z,2] .= -im.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi
-        E[:,:,z,3] .= -2 .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*cosphi
+
+        if pp.polarization == pol_x
+            E[:,:,z,1] .= ((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
+            E[:,:,z,2] .= (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi
+            E[:,:,z,3] .= 2im .* .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*cosphi
+        elseif pp.polarization == pol_y
+            E[:,:,z,1] .= (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi # sin2phi with pi/2 phase shift becomes -sin2phi
+            E[:,:,z,2] .= ((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).-cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])) # cos2phi becomes -cos2phi
+            E[:,:,z,3] .= 2im .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*sinphi # cosphi becomes -sinphi 
+        elseif pp.polarization == pol_circ # pol_x + im* pol_y
+            E[:,:,z,1] .= 1/sqrt(2).*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])) .+
+            im/sqrt(2)*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi 
+            E[:,:,z,2] .= 1/sqrt(2).*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi .+
+            im/sqrt(2)*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).-cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
+            E[:,:,z,3] .= 2im/sqrt(2)*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*(cosphi .+ im * sinphi)
+        elseif pp.polarization == pol_scalar # scalar approximation
+            E[:,:,z,1] .=  (w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]) # .+ (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]) .+ 1 .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1])
+        else
+            error("unsupported polarization for Richards-Wolf method")
+        end
     end
-    return E
+     # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
+     return normalize_amp_to_plane(E) # no idea why this scaling is needed: .* 1.14 
 end
 
 """

@@ -8,6 +8,15 @@ function pupil_θ(sz, pp::PSFParams, sampling)
 end
 
 """
+    limit_θ(theta, pp)
+
+limits the maximum angle to the theoretical theta. This is particularly important for the 1/sqrt(cos θ) aplanatic factor as this factor diverges and wins over the roundoff errors of the smooth pupil.
+"""
+function limit_θ(theta, pp)
+    min.(theta, asin(pp.NA/pp.n))
+end
+
+"""
     pupil_ϕ(sz, pp::PSFParams, sampling)
 
 returns the azimuthal angle ϕ  in the sample space as a pupil array.
@@ -21,8 +30,12 @@ end
 
 returns the aplanatic factor as specified in `pp.aplanatic` as a pupil array.
 """
-function aplanatic_factor(sz, pp::PSFParams, sampling)
-    pp.aplanatic.(pupil_θ(sz, pp, sampling))
+function aplanatic_factor(sz, pp::PSFParams, sampling; is_proj=false)
+    if is_proj
+        pp.aplanatic.(limit_θ(pupil_θ(sz, pp, sampling),pp)) ./ cos.(limit_θ(pupil_θ(sz, pp, sampling), pp))
+    else
+        pp.aplanatic.(limit_θ(pupil_θ(sz, pp, sampling),pp))
+    end
 end
 
 """
@@ -31,7 +44,7 @@ end
 returns the pupil polarization as a 4D array with the XY polarization components stacked along the 4th dimension.
 """
 function field_pupil(sz, pp, sampling)
-    idx_to_dim(pp.polarization.(pp.dtype, k_xy_rel_pupil(sz,pp,sampling)), 4)
+    idx_to_dim(expand_dims(pp.polarization.(pp.dtype, k_xy_rel_pupil(sz,pp,sampling)),Val(3)))
 end
 
 """
@@ -70,14 +83,14 @@ end
 
 creates a pupil with electric field distributions in XYZ. Returns a 4D dataset with the electric field components along the 4th dimension.
 """
-function pupil_xyz(sz, pp, sampling=nothing)
+function pupil_xyz(sz, pp, sampling=nothing; is_proj=true)
     if isnothing(sampling)
         sampling = get_Ewald_sampling(sz, pp)
     end
     if isnothing(pp.aberrations) || isempty(pp.aberrations.indices)
-        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
+        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling, is_proj=is_proj) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
     else
-        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling) .* get_zernike_pupil(sz, pp, sampling) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
+        field_xyz(sz, pp, sampling) .* aplanatic_factor(sz,pp,sampling, is_proj=is_proj) .* get_zernike_pupil(sz, pp, sampling) .* ft(jinc_r_2d(sz[1:2], pp, sampling=sampling) .* my_disc(sz[1:2],pp))
     end
 end
 

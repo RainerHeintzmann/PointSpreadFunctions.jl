@@ -10,6 +10,8 @@ struct MethodPropagate <: PSFMethod end
 struct MethodPropagateIterative<: PSFMethod end
 struct MethodRichardsWolf <: PSFMethod end
 struct MethodShell <: PSFMethod end
+struct MethodParaxial <: PSFMethod end
+
 export Aberrations
 export Zernike_Piston, Zernike_Tilt, Zernike_Tip, Zernike_ObliqueAstigmatism, Zernike_Defocus, Zernike_VerticalAstigmatism, Zernike_VerticalTrefoil
 export Zernike_VerticalComa, Zernike_HorizontalComa, Zernike_ObliqueTrefoil, Zernike_ObliqueQuadrafoil, Zernike_ObliqueSecondaryAstigmatism, Zernike_Spherical
@@ -106,7 +108,7 @@ PSFParams(0.58, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#4
 ```
 """
 struct PSFParams
-    λ  # Vacuum wavelength
+    λ  # Vacuum emission wavelength in µm
     NA # numerical aperture
     n # refractive index of the embedding AND immersion medium
     dtype # real-valued data type to generate PSF for
@@ -124,10 +126,10 @@ end
     aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
     aberrations=Aberrations(), pixelshape=nothing)
 
-creates the PSFParams structure via this constructor.
+creates the PSFParams structure via this constructor. You can also call `PSFParams` with the first argument being an existing structure and just specify the parameters to change via one or multiple named arguments.
 
 Arguments:
-+ λ:            Vacuum wavelength (same units as sampling, default is 0.5 µm)
++ λ:            Vacuum emsision wavelength (same units as sampling, default is 0.5 µm)
 + NA:           numerical aperture
 + n:            refractive index of the embedding AND immersion medium
 + pol: a function calculating the polarization from a given Tuple of relative-k pupil vectors
@@ -146,14 +148,29 @@ Example:
 ```jdoctest
 julia> using FFTW, PSFs
 
-julia> ppm = PSFParams(0.58, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodSincR, aberrations= aberr, FFTPlan=FFTW.MEASURE)
+julia> ppm = PSFParams(0.58, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodSincR, aberrations= Aberrations(), FFTPlan=FFTW.MEASURE)
 PSFParams(0.58, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodSincR, 0x00000000, nothing, nothing)
+
+julia> ppem = PSFParams(ppm; λ=0.620)
 
 ```
 """
-function PSFParams(my_λ=0.5, my_NA=1.2, my_n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
+function PSFParams(λ=0.5, NA=1.2, n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
                     aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
                     aberrations=Aberrations(), pixelshape=nothing)
-    PSFParams(my_λ, my_NA, my_n, dtype, mode, pol, aplanatic, method, FFTPlan, aberrations, pixelshape)
+    PSFParams(λ, NA, n, dtype, mode, pol, aplanatic, method, FFTPlan, aberrations, pixelshape)
 end
 
+"""
+    PSFParams(pp; λ=pp.λ, NA=pp.NA, n=pp.n,  pol=pp.polarization, dtype=pp.dtype, mode=pp.mode, 
+        aplanatic = pp.aplanatic, method=pp.method, FFTPlan=pp.FFTPlan,
+        aberrations=pp.aberrations, pixelshape=pp.pixelshape)
+
+    Alternative conveniance version to construct a PSF parameter structure using an existing structure `pp` and overwriting one or multiple parameters via named arguments.
+    See the other version of `PSFParams` for documentation.
+"""
+function PSFParams(pp::PSFParams; λ=pp.λ, NA=pp.NA, n=pp.n,  pol=pp.polarization, dtype=pp.dtype, mode=pp.mode, 
+    aplanatic = pp.aplanatic, method=pp.method, FFTPlan=pp.FFTPlan,
+    aberrations=pp.aberrations, pixelshape=pp.pixelshape)
+    PSFParams(λ, NA, n, dtype, mode, pol, aplanatic, method, FFTPlan, aberrations, pixelshape)
+end
