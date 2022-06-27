@@ -8,6 +8,15 @@ function pupil_θ(sz, pp::PSFParams, sampling)
 end
 
 """
+    limit_θ(theta, pp)
+
+limits the maximum angle to the theoretical theta. This is particularly important for the 1/sqrt(cos θ) aplanatic factor as this factor diverges and wins over the roundoff errors of the smooth pupil.
+"""
+function limit_θ(theta, pp)
+    min.(theta, asin(pp.NA/pp.n))
+end
+
+"""
     pupil_ϕ(sz, pp::PSFParams, sampling)
 
 returns the azimuthal angle ϕ  in the sample space as a pupil array.
@@ -23,9 +32,9 @@ returns the aplanatic factor as specified in `pp.aplanatic` as a pupil array.
 """
 function aplanatic_factor(sz, pp::PSFParams, sampling; is_proj=false)
     if is_proj
-        pp.aplanatic.(pupil_θ(sz, pp, sampling)) ./ cos.(pupil_θ(sz, pp, sampling))
+        pp.aplanatic.(limit_θ(pupil_θ(sz, pp, sampling),pp)) ./ cos.(limit_θ(pupil_θ(sz, pp, sampling), pp))
     else
-        pp.aplanatic.(pupil_θ(sz, pp, sampling))
+        pp.aplanatic.(limit_θ(pupil_θ(sz, pp, sampling),pp))
     end
 end
 

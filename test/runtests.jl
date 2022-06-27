@@ -30,7 +30,9 @@ function compare_asfs(sz, pp, sampling)
 end
 
 @testset "Compare various aPSFs" begin
-    pp = PSFParams(pol=pol_scalar)
+    pp = PSFParams(pol=pol_scalar, aplanatic=aplanatic_illumination)
+    compare_asfs(sz, pp, sampling)
+    pp = PSFParams(pol=pol_scalar, aplanatic=aplanatic_detection)
     compare_asfs(sz, pp, sampling)
     pp = PSFParams(pol=pol_circ)
     compare_asfs(sz, pp, sampling)
@@ -57,21 +59,26 @@ pb = 86
 end
 
 @testset "confocal PSF" begin
-    sampling = (0.045,0.045,0.080)
-    sz = (64,64,32)
+    sampling = (0.04,0.04,0.120)
+    sz = (128,128,128)
     pp_em = PSFParams(0.5,1.3,1.52; mode=ModeConfocal);
-    pp_ex = PSFParams(pp_em; λ=0.488);
+    pp_ex = PSFParams(pp_em; λ=0.488, aplanatic=aplanatic_illumination);
     pinhole = 0.001
-    pc = psf(sz,pp_em; pp_ex=pp_ex, pinhole=pinhole, sampling=sampling);
+    @time pc = psf(sz,pp_em; pp_ex=pp_ex, pinhole=pinhole, sampling=sampling);
+    @time pc_open = psf(sz,pp_em; pp_ex=pp_ex, pinhole=5.0, sampling=sampling);
+    @time pc_open2 = psf(sz,pp_em; pp_ex=pp_ex, pinhole=5.0, sampling=sampling, use_resampling=false);
 
     pp_em = PSFParams(0.5,1.3,1.52; mode=ModeWidefield);
     pw_em = psf(sz,pp_em; sampling=sampling);
-    pp_ex = PSFParams(pp_em; λ=0.488);
+    pp_ex = PSFParams(pp_em; λ=0.488, aplanatic=aplanatic_illumination);
     pw_ex = psf(sz,pp_ex; sampling=sampling);
     pc2 = pw_ex .* pw_em
     # check if the confocal calculations agree for a very small pinhole
-    @test isapprox(pc ./ sum(pc), pc2./sum(pc2); rtol=0.0001)
-    @test isapprox(pc ./ maximum(pc), pc2./maximum(pc2); rtol=0.0001)
+    @test isapprox(pc ./ sum(pc), pc2./sum(pc2); rtol=0.01)
+    @test isapprox(pc ./ maximum(pc), pc2./maximum(pc2); rtol=0.01)
+    # test if the pinhole normalization is correct. For a very large pinhole the PSF is an excitation WF PSF
+    @test ctr_test(pc_open2, pw_ex, 0.15)
+    @test ctr_test(pc_open, pw_ex, 0.15)
 end
 
 return

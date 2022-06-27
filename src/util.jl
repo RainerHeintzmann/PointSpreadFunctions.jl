@@ -187,16 +187,17 @@ See also:
 ```jdoctest
 julia> using PSFs, View5D
 
-julia> sz=(100,100);d=20.0; w=jinc_r_2d(sz,d); 
+julia> sz = (100,100);d=20.0; w=jinc_r_2d(sz,d); 
 
-julia> q=jinc_r_2d(sz, d; r_func=PSFs.rr_rfft); # a version in RFFT space
+julia> q = jinc_r_2d(sz, d; r_func=PSFs.rr_rfft); # a version in RFFT space
 
 julia> @vt rr(sz) .< d/2.0 real.(ift(w)) fftshift(irfft(q,sz[1]))
 ```
 """
 function jinc_r_2d(sz::NTuple, diameter=(1.0,1.0), dtype=Float32; r_func=rr)
+    diameter = (1,1) .* diameter
     scale = diameter./sz[1:2]
-    sfac = pi.*prod(diameter)
+    sfac = (pi/4).*prod(diameter)
     sfac .* jinc.(r_func(dtype, sz[1:2], scale=scale))
 end
 
@@ -439,6 +440,16 @@ function check_amp_sampling_sincr(sz, pp,sampling) # The sinc-r method needs (fo
     end
 end
 
+"""
+    normalize_amp_to_plane(apsf, plane=nothing, mydim=4)
+
+normalizes an amplitude PSF such that the intensity sum over the `plane` position along dimension `mydim`
+"""
+function normalize_amp_to_plane(apsf, plane=nothing, mydim=3)
+    plane = isnothing(plane) ?  size(apsf,mydim)÷2+1 : plane = plane
+    mysumI = sum(abs2.(slice(apsf, mydim, plane)))
+    return apsf ./ sqrt(mysumI)
+end
 
 """
     calc_with_resampling(fct, sz, sampling, args)
@@ -447,9 +458,10 @@ end
 +`fct`:  Function that performs the calculation. Its first argument needs to be the N-dimensional data size `sz` and the `sampling`.
 +`sz`:  size of the array to calculate
 +`sampling`: pixel sizes of the final array to calculate
++ `norm_amp`:  decides whether amplitude or intensity is normalized to account for the size change
 
 """
-function calc_with_resampling(fct, sz, sampling)
+function calc_with_resampling(fct, sz, sampling; norm_amp=true)
     # ensure that the data is at least 3D
     sz, sampling, is2d = let 
         if length(sz)>2
@@ -486,13 +498,7 @@ function calc_with_resampling(fct, sz, sampling)
 
     # Note that the upsampling leads to a one-pixel shift of the center for each odd-size dimension
     # This is taken care of in the select_region code below
-    res = let
-        if sz[3] == 1
-            upsample2(res_small .* mywin, dims=(1,2))
-        else
-            upsample2(res_small .* mywin, dims=(1,2,3))
-        end
-    end
+    res = upsample2(res_small .* mywin, fix_center=true, keep_singleton=true)
     res = let
         if is2d
             dropdims(res, dims=3)
@@ -500,7 +506,14 @@ function calc_with_resampling(fct, sz, sampling)
             res
         end
     end
+    # account for the brightness change during rescaling. Only the lateral sizes matter.
+    scale = let 
+        if norm_amp
+           sqrt(prod(size(res_small)[1:2]) / prod(size(res)[1:2]))
+        else
+           prod(size(res_small)[1:2]) / prod(size(res)[1:2])
+        end        
+    end
     # select the appropriate wanted size
-    recenter = size(res).÷2 .- 2 .*(size(res).÷4) 
-    return select_region_view(res, center = 1 .+ size(res).÷2 .- recenter, new_size=sz)
+    return select_region_view(res, new_size=sz) .* scale
 end

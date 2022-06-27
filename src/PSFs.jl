@@ -29,75 +29,18 @@ julia> p = psf((128,128,128),pp; sampling=(0.50,0.50,0.200));
 ```
 """
 function psf(::Type{ModeWidefield}, sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, return_amp=false) # unclear why the resampling seems to be so bad
-    sz, sampling, is2d = let 
-        if length(sz)>2
-            sz, sampling, false
-        else
-            (sz[1:2]...,1), (sampling[1:2]..., eps(eltype(sampling))), true
-        end
-    end
-
-    if use_resampling == false
-        amp = apsf(sz, pp, sampling=sampling)
-        if return_amp
-            return amp_to_int(amp), amp
-        else
-            return amp_to_int(amp)
-        end
-    end
-    extra_layers = 2
-    small_sz=ceil.(Int,sz./2) .+ extra_layers
-    big_sz = small_sz .* 2  # size after upsampling
-    small_sz, big_sz = let 
-        if sz[3]==1
-            (small_sz[1:2]...,1), (big_sz[1:2]...,1)
-        else
-            small_sz, big_sz
-        end        
-    end
-    if ~isnothing(sampling)
-        amp_sampling = sampling .* big_sz ./ small_sz
-    else
-        amp_sampling = nothing
-    end
-    amp = apsf(small_sz, pp, sampling=amp_sampling, center_kz=true)
-    if !isnothing(pp.FFTPlan)
-        P1d = plan_fft(amp,(1,2), flags=pp.FFTPlan)
-        P1id = plan_ifft(amp,(1,2), flags=pp.FFTPlan)
-    end
-    border_in = (0,0, ceil.(Int,sz[3]./2) ./ small_sz[3],0)
-    mywin = collect(window_hanning((1,1,small_sz[3],1), border_in=border_in, border_out=1)) # for speed reasons the collect is faster
-
-    # Note that the upsampling leads to a one-pixel shift of the center for each odd-size dimension
-    # This is taken care of in the select_region code below
     amp = let
-        if sz[3] == 1
-            upsample2(amp .* mywin,dims=(1,2))
+        if use_resampling
+            fct_ex = (sz,my_sampling) -> apsf(sz, pp, sampling=my_sampling, center_kz=true)
+            calc_with_resampling(fct_ex, sz, sampling, norm_amp=true)
         else
-            upsample2(amp .* mywin,dims=(1,2,3))
+            apsf(sz, pp, sampling=sampling)
         end
     end
-    res = sum(abs2.(amp),dims=4)[:,:,:,1]
-    res = let
-        if is2d
-            dropdims(res, dims=3)
-        else
-            res
-        end
-    end
-    if true # any(isodd.(sz))
-        recenter = size(res).÷2 .- 2 .*(size(res).÷4) 
-        if return_amp
-            return select_region_view(res, center = 1 .+ size(res).÷2 .- recenter, new_size=sz), amp
-        else
-            return select_region_view(res, center = 1 .+ size(res).÷2 .- recenter, new_size=sz)
-        end
+    if return_amp
+        return amp_to_int(amp), amp
     else
-        if return_amp
-            return res, amp
-        else
-            return res
-        end
+        return amp_to_int(amp)
     end
 end
 
@@ -133,14 +76,14 @@ function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, 
 
     # creat a pseudo parameter structure with the combined wavelength just to check the individual amplitude samplings of the final result.
     λeff = 1 / (1/pp_ex.λ + 1/pp_em.λ)
-    pp_both = PSFParams(pp_em; λ= λeff)
+    pp_both = PSFParams(pp_em; λ=λeff)
     # the factor of two below, is since the amp psf can be twice undersampled, but the intensity psf not.
     check_amp_sampling(sz, pp_both, sampling .* 2.0)
 
     psf_ex = let
         if use_resampling
             fct_ex = (sz,my_sampling) -> psf(ModeWidefield, sz, pp_ex; sampling=my_sampling, use_resampling=use_resampling)
-            calc_with_resampling(fct_ex, sz, sampling)
+            calc_with_resampling(fct_ex, sz, sampling, norm_amp=false)
         else
             psf(ModeWidefield, sz, pp_ex; sampling=sampling, use_resampling=use_resampling)
         end
@@ -150,7 +93,7 @@ function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, 
     psf_em = let
         if use_resampling
             fct_em = (sz,my_sampling) -> psf(ModeWidefield, sz,pp_em; sampling=my_sampling, use_resampling=use_resampling)
-            calc_with_resampling(fct_em, sz, sampling)
+            calc_with_resampling(fct_em, sz, sampling, norm_amp=false)
         else
             psf(ModeWidefield, sz, pp_em; sampling=sampling, use_resampling=use_resampling)
         end
@@ -160,12 +103,15 @@ function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, 
     # The Airy Unit is the diameter of the Airy disc: 1.22 * lamda_em / NA 
     AU = 1.22 * pp_em.λ / pp_em.NA
     AU_pix = AU ./ sampling[1:2]
+    if any(pinhole .* AU_pix .> sz[1:2]) 
+        @warn "Pinhole is larger than image this leads to serious aliasing artefacts. Maximal pinhole size is: $(sz[1:2]./AU_pix) AU."
+    end
     # This can be done a lot more efficiently by staying in Fourier space. Ideally even by only calculating half the range of the jinc function:
     # pinhole = real.(ift2d(jinc_r_2d(sz, pinhole .* AU_pix, pp_em.dtype)))
     # pinhole_ft = rfft2d(ifftshift(pinhole))
     pinhole_ft = jinc_r_2d(sz, pinhole .* AU_pix, pp_em.dtype; r_func= PSFs.rr_rfft)
     # pinhole_ft = rfft2d(ifftshift(pinhole))
-    # return pinhole, pinhole_ft
+    # return pinhole_ft
     my_em = irfft2d(rfft2d(psf_em) .* pinhole_ft, sz[1])
     return my_em .* psf_ex
 end

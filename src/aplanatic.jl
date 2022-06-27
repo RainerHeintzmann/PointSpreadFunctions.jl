@@ -5,7 +5,7 @@ export aplanatic_detection, aplanatic_illumination, aplanatic_const, aplanatic_i
     limit_theta(θ)
     limits the angle to pi/2
 """
-limit_theta = (θ) -> eltype(θ).(θ .< eltype(θ).(pi)/2)
+limit_theta = (θ) -> eltype(θ).(θ .< pi/2)
 
 
 """

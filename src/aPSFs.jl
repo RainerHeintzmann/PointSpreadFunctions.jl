@@ -63,7 +63,8 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
     end
 
     res=ift2d(pupils) # This should really be a zoomed iFFT
-    return select_region(res, new_size=sz[1:3]) # extract the central bit, which avoids the wrap-around effects
+    # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
+    return normalize_amp_to_plane(select_region(res, new_size=sz[1:3])) # extract the central bit, which avoids the wrap-around effects
     # , sampling
 end
 
@@ -121,7 +122,8 @@ function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothi
         Pm2d = plan_fft(pupils,(1,2), flags=pp.FFTPlan)
     end
     res=ift2d(pupils) # This should really be a zoomed iFFT
-    return res # extract the central bit, which avoids the wrap-around effects
+     # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
+     return normalize_amp_to_plane(res) # extract the central bit, which avoids the wrap-around effects
 end
 
 # This function is needed for the propagate method, but iterates between real and Fourier space always smoothly deleting "out-of-bound" waves.
@@ -202,7 +204,8 @@ function apsf(::Type{MethodPropagateIterative}, sz::NTuple, pp::PSFParams; sampl
     end
 
     check_amp_sampling(sz, pp, sampling)
-    slices = apply_propagator_iteratively(sz, pp, sampling=sampling, center_kz=center_kz)
+     # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
+     slices = normalize_amp_to_plane(apply_propagator_iteratively(sz, pp, sampling=sampling, center_kz=center_kz))
 
     if is2d
         return dropdims(slices,dims=3)
@@ -239,7 +242,8 @@ function apsf(::Type{MethodShell}, sz::NTuple, pp::PSFParams; sampling=nothing, 
 
     pupils = apply_kz_to_pupil(pupil, sz[3], pp, sampling=sampling)    
     res=ift2d(pupils) # This should really be a zoomed iFFT
-    return res # extract the central bit, which avoids the wrap-around effects
+     # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
+    return normalize_amp_to_plane(res) # extract the central bit, which avoids the wrap-around effects
 end
 
 function simpson!(f,α,N=80)
@@ -289,7 +293,7 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
         end
     end
 
-    integrate!(I012, h/6*aplanatic_fct(0), 0) # first value
+    integrate!(I012, h/6*aplanatic_fct(0.0), 0.0) # first value
     for n in 0:N-1 # integrate using Simpsons rule
         theta = h*(n+0.5) # middle value(s)
         integrate!(I012, 4*h/6*aplanatic_fct(theta), theta) # middle values count 4 times
@@ -342,7 +346,8 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
             error("unsupported polarization for Richards-Wolf method")
         end
     end
-    return E .* 1.14 # no idea why this scaling is needed
+     # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
+     return normalize_amp_to_plane(E) # no idea why this scaling is needed: .* 1.14 
 end
 
 """
