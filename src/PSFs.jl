@@ -24,8 +24,8 @@ See also:
 
 Example:
 ```jdoctest
-julia> pp = PSFParams(500.0,1.4,1.52);
-julia> p = psf((128,128,128),pp; sampling=(50,50,100));
+julia> pp = PSFParams(0.5,1.4,1.52);
+julia> p = psf((128,128,128),pp; sampling=(0.50,0.50,0.200));
 ```
 """
 function psf(::Type{ModeWidefield}, sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, return_amp=false) # unclear why the resampling seems to be so bad
@@ -67,6 +67,9 @@ function psf(::Type{ModeWidefield}, sz::NTuple, pp::PSFParams; sampling=nothing,
     end
     border_in = (0,0, ceil.(Int,sz[3]./2) ./ small_sz[3],0)
     mywin = collect(window_hanning((1,1,small_sz[3],1), border_in=border_in, border_out=1)) # for speed reasons the collect is faster
+
+    # Note that the upsampling leads to a one-pixel shift of the center for each odd-size dimension
+    # This is taken care of in the select_region code below
     amp = let
         if sz[3] == 1
             upsample2(amp .* mywin,dims=(1,2))
@@ -83,10 +86,11 @@ function psf(::Type{ModeWidefield}, sz::NTuple, pp::PSFParams; sampling=nothing,
         end
     end
     if true # any(isodd.(sz))
+        recenter = size(res).÷2 .- 2 .*(size(res).÷4) 
         if return_amp
-            return select_region_view(res,new_size=sz), amp
+            return select_region_view(res, center = 1 .+ size(res).÷2 .- recenter, new_size=sz), amp
         else
-            return select_region_view(res,new_size=sz)
+            return select_region_view(res, center = 1 .+ size(res).÷2 .- recenter, new_size=sz)
         end
     else
         if return_amp
@@ -98,13 +102,22 @@ function psf(::Type{ModeWidefield}, sz::NTuple, pp::PSFParams; sampling=nothing,
 end
 
 """
-    psf(::Type{ModeConfocal}, sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, return_amp=false) # unclear why the resampling seems to be so bad
-    Calculates a confocal point spread function.
+    psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, pinhole=nothing, sampling=nothing, use_resampling=true, return_amp=false) # unclear why the resampling seems to be so bad
+    Calculates a confocal point spread function. The normalisation is such that a completely open `pinhole` diameter yields the excitation PSF with its normalization. 
     
+#Parameters
++ `sz`:         size tuple of the final PSF
++ `pp_em`:      PSF parameters of the emission PSF. This should include the emission wavelength
++ `pp_xe=nothing`:      This is a required named parameter, containing all the settings for the excitation PSF. This should include the excitation wavelength as well as typically `aplanatic=aplanatic_illumination`.
++ `pinhole=nothing`:    The diameter of the pinhole in Airy Units (AU = 1.22 λ/NA). A pinhole size of one AU corresponds to a pinhole border falling onto the first zero of a corresponding paraxial emission PSF.
++ `sampling=nothing`:   The sampling parameters of the resulting PSF.
++ `use_resampling=true`: Exploits a calculation trick, which first calculates the individual PSFs on a twice coarser grid in XY and Z and then upsamples the result. Note that this may be inappropriate due toundersampling due to the Stokes shift which is neglected here. But warnings will then result during the calculations of the subsampled widefield PSFs.
++ `return_amp=false`:    Has to be `false` since confocal amplitude spread functions do not exist for non-zero pinhole sizes. 
+
 ```jdoctest
-julia> pp_em = PSFParams(500.0,1.4,1.52; mode=ModeConfocal);
-julia> pp_ex = PSFParams(pp_em; λ=0.488);
-julia> p = psf((128,128,128),pp; pp_ex=pp_ex, pinhole=1.0, sampling=(50,50,100));
+julia> pp_em = PSFParams(0.5,1.4,1.52; mode=ModeConfocal);
+julia> pp_ex = PSFParams(pp_em; λ=0.488, aplanatic=aplanatic_illumination);
+julia> p = psf((128,128,128),pp_em; pp_ex=pp_ex, pinhole=0.1, sampling=(0.040,0.040,0.100));
 ```
 """
 function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, pinhole=nothing, sampling=nothing, use_resampling=true, return_amp=nothing) # unclear why the resampling seems to be so bad
@@ -114,11 +127,9 @@ function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, 
     if isnothing(pinhole)
         error("The named parameter `pinhole` is obligatory for confocal calculation. Provide the excitation PSF parameters here.")
     end
-    if !isnothing(return_amp) || return_amp == true
+    if !isnothing(return_amp) && return_amp == true
         error("A confocal PSF cannot return an amplitude. Please use `return_amp=false`.")
     end
-    #ToDo: implement the use_resampling also for the confocal by undersampling the widefield PSFs and upsampling the result. 
-    # Implement: coarse_calc_upsample_cut(sz, sampling, fct) and use it in all the functions that utilize this trick
 
     # creat a pseudo parameter structure with the combined wavelength just to check the individual amplitude samplings of the final result.
     λeff = 1 / (1/pp_ex.λ + 1/pp_em.λ)
@@ -126,17 +137,34 @@ function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, 
     # the factor of two below, is since the amp psf can be twice undersampled, but the intensity psf not.
     check_amp_sampling(sz, pp_both, sampling .* 2.0)
 
-    psf_ex = psf(ModeWidefield, sz, pp_ex; sampling=sampling, use_resampling=use_resampling)
+    psf_ex = let
+        if use_resampling
+            fct_ex = (sz,my_sampling) -> psf(ModeWidefield, sz, pp_ex; sampling=my_sampling, use_resampling=use_resampling)
+            calc_with_resampling(fct_ex, sz, sampling)
+        else
+            psf(ModeWidefield, sz, pp_ex; sampling=sampling, use_resampling=use_resampling)
+        end
+    end
+
     # pp_em = PSFParams(pp, mode = ModeWidefield)
-    psf_em = psf(ModeWidefield, sz, pp_em; sampling=sampling, use_resampling=use_resampling)
+    psf_em = let
+        if use_resampling
+            fct_em = (sz,my_sampling) -> psf(ModeWidefield, sz,pp_em; sampling=my_sampling, use_resampling=use_resampling)
+            calc_with_resampling(fct_em, sz, sampling)
+        else
+            psf(ModeWidefield, sz, pp_em; sampling=sampling, use_resampling=use_resampling)
+        end
+    end
 
     # now we need to modify the sampling such that the pinhole corrsponds to the equivalent of one Airy Unit.
     # The Airy Unit is the diameter of the Airy disc: 1.22 * lamda_em / NA 
     AU = 1.22 * pp_em.λ / pp_em.NA
     AU_pix = AU ./ sampling[1:2]
     # This can be done a lot more efficiently by staying in Fourier space. Ideally even by only calculating half the range of the jinc function:
-    pinhole = real.(ift2d(jinc_r_2d(sz, pinhole .* AU_pix, pp_em.dtype)))
-    pinhole_ft = rfft2d(ifftshift(pinhole))
+    # pinhole = real.(ift2d(jinc_r_2d(sz, pinhole .* AU_pix, pp_em.dtype)))
+    # pinhole_ft = rfft2d(ifftshift(pinhole))
+    pinhole_ft = jinc_r_2d(sz, pinhole .* AU_pix, pp_em.dtype; r_func= PSFs.rr_rfft)
+    # pinhole_ft = rfft2d(ifftshift(pinhole))
     # return pinhole, pinhole_ft
     my_em = irfft2d(rfft2d(psf_em) .* pinhole_ft, sz[1])
     return my_em .* psf_ex
@@ -155,8 +183,8 @@ See also:
 
 Example:
 ```jdoctest
-julia> pp = PSFParams(500.0,1.4,1.52);
-julia> p = psf((128,128,128),pp; sampling=(50,50,100));
+julia> pp = PSFParams(0.5,1.4,1.52);
+julia> p = psf((128,128,128),pp; sampling=(0.050,0.050,0.200));
 ```
 """
 function psf(sz::NTuple, pp::PSFParams; nps...) # unclear why the resampling seems to be so bad
