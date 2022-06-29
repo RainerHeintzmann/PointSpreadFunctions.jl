@@ -158,7 +158,7 @@ calculates the Fourier transform of a disc-shaped pinhole
 + `pinhole`: diameter of the pinhole in pixels
 """
 function disc_pinhole_ft(sz, pp, pinhole)
-    jinc_r_2d(sz, pinhole, pp_em.dtype; r_func= PSFs.rr_rfft)
+    jinc_r_2d(sz, pinhole, pp.dtype; r_func= PSFs.rr_rfft)
 end
 
 """
