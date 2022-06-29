@@ -4,7 +4,10 @@ using FourierTools, NDTools, IndexFunArrays, SpecialFunctions, FFTW
 using ZernikePolynomials
 export PSFParams, sinc_r, jinc_r_2d, pupil_xyz, apsf, psf, k0, kxy, aplanatic_factor
 export get_Abbe_limit, get_Nyquist_limit
+export kz_mid_pos
+
 export ModeWidefield, ModeConfocal, Mode4Pi, ModeISM, Mode2Photon
+export MethodRichardsWolf, MethodPropagate, MethodPropagateIterative, MethodShell, MethodSincR
 
 include("aplanatic.jl")
 include("PSF_types.jl")
@@ -45,7 +48,7 @@ function psf(::Type{ModeWidefield}, sz::NTuple, pp::PSFParams; sampling=nothing,
     amp = let
         if use_resampling
             fct_ex = (sz,my_sampling) -> apsf(sz, pp, sampling=my_sampling, center_kz=true)
-            calc_with_resampling(fct_ex, sz, sampling, norm_amp=true)
+            calc_with_resampling(fct_ex, sz, sampling, norm_amp=true) # , shift_kz=kz_mid_pos(sz, pp, sampling)
         else
             apsf(sz, pp, sampling=sampling)
         end
@@ -132,6 +135,7 @@ function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, 
     # pinhole_ft = rfft2d(ifftshift(pinhole))
 
     all_PSFs = [];
+
     rfft_psf_em = rfft2d(psf_em)
     for p in pinhole_positions
         my_pinhole_ft = exp_ikx_rfft(pp_em.dtype,sz, shift_by=p) .* pinhole_ft(sz, pp_em, pinhole.* AU_pix)

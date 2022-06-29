@@ -121,7 +121,7 @@ function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothi
     if !isnothing(pp.FFTPlan)
         Pm2d = plan_fft(pupils,(1,2), flags=pp.FFTPlan)
     end
-    res=ift2d(pupils) # This should really be a zoomed iFFT
+    res = ift2d(pupils) # This should really be a zoomed iFFT
      # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
      return normalize_amp_to_plane(res) # extract the central bit, which avoids the wrap-around effects
 end
@@ -240,7 +240,15 @@ function apsf(::Type{MethodShell}, sz::NTuple, pp::PSFParams; sampling=nothing, 
     check_amp_sampling(sz, pp, sampling)
     pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
 
-    pupils = apply_kz_to_pupil(pupil, sz[3], pp, sampling=sampling)    
+    pupils = apply_kz_to_pupil(pupil, sz[3], pp, sampling=sampling)
+    if center_kz
+        _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling)
+        pupils .*= cispi.((-2*rel_kz/sz[3]) .* zz((1,1,sz[3]))) # centers the McCutchen pupil to be able to correctly resample it along kz
+    end
+    if !isnothing(pp.FFTPlan)
+        Pm2d = plan_fft(pupils,(1,2), flags=pp.FFTPlan)
+    end
+
     res=ift2d(pupils) # This should really be a zoomed iFFT
      # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
     return normalize_amp_to_plane(res) # extract the central bit, which avoids the wrap-around effects
@@ -321,27 +329,32 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
         end
     end
     E = zeros(Complex{pp.dtype}, (sz...,numEl)) # I0, I1 and I2
+    _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling)
     for z = 1:sz[3]
         I0 = @view I012[:,z,1] # create views to be able to write by 1D indexing into the appropriate slices.
         I1 = @view I012[:,z,2]
         I2 = @view I012[:,z,3]
 
+        z_pos = z - (sz[3]÷2+1)
+
+        rel_phase = center_kz ? Complex{pp.dtype}(cispi.((-2*rel_kz/sz[3]) .* z_pos)) : pp.dtype(0) # centers the McCutchen pupil to be able to correctly resample it along kz
+    
         if pp.polarization == pol_x
-            E[:,:,z,1] .= ((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
-            E[:,:,z,2] .= (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi
-            E[:,:,z,3] .= 2im .* .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*cosphi
+            E[:,:,z,1] .= rel_phase .* ((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
+            E[:,:,z,2] .= rel_phase .* (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi
+            E[:,:,z,3] .= rel_phase .* (2im .* .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*cosphi)
         elseif pp.polarization == pol_y
-            E[:,:,z,1] .= (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi # sin2phi with pi/2 phase shift becomes -sin2phi
-            E[:,:,z,2] .= ((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).-cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])) # cos2phi becomes -cos2phi
-            E[:,:,z,3] .= 2im .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*sinphi # cosphi becomes -sinphi 
+            E[:,:,z,1] .= rel_phase .* (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi # sin2phi with pi/2 phase shift becomes -sin2phi
+            E[:,:,z,2] .= rel_phase .* ((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).-cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])) # cos2phi becomes -cos2phi
+            E[:,:,z,3] .= rel_phase .* 2im .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*sinphi # cosphi becomes -sinphi 
         elseif pp.polarization == pol_circ # pol_x + im* pol_y
-            E[:,:,z,1] .= 1/sqrt(2).*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])) .+
-            im/sqrt(2)*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi 
-            E[:,:,z,2] .= 1/sqrt(2).*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi .+
-            im/sqrt(2)*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).-cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
-            E[:,:,z,3] .= 2im/sqrt(2)*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*(cosphi .+ im * sinphi)
+            E[:,:,z,1] .= rel_phase .* (1/sqrt(2).*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])) .+
+            im/sqrt(2)*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi)
+            E[:,:,z,2] .= rel_phase .* (1/sqrt(2).*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi .+
+            im/sqrt(2)*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).-cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])))
+            E[:,:,z,3] .= rel_phase .* (2im/sqrt(2)*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*(cosphi .+ im * sinphi))
         elseif pp.polarization == pol_scalar # scalar approximation
-            E[:,:,z,1] .=  (w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]) # .+ (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]) .+ 1 .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1])
+            E[:,:,z,1] .= rel_phase .* (w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]) # .+ (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]) .+ 1 .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1])
         else
             error("unsupported polarization for Richards-Wolf method")
         end

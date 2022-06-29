@@ -104,7 +104,7 @@ Example:
 ```jdoctest
 julia> using FFTW, PSFs
 
-julia> ppm = PSFParams(0.580, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodSincR, aberrations= aberr, FFTPlan=FFTW.MEASURE)
+julia> ppm = PSFParams(0.580, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodRichardsWolf, aberrations= aberr, FFTPlan=FFTW.MEASURE)
 PSFParams(0.58, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodSincR, 0x00000000, nothing, nothing)
 
 ```
@@ -127,7 +127,7 @@ end
 
 """
     PSFParams(λ=0.5, NA=1.2, n=1.33; pol=pol_circ, dtype=Float32, mode=ModeWidefield, 
-    aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
+    aplanatic = aplanatic_detection, method=MethodRichardsWolf, FFTPlan=nothing,
     aberrations=Aberrations(), pixelshape=nothing, transition_dipole=nothing, λ_weights=nothing)
 
 creates the PSFParams structure via this constructor. You can also call `PSFParams` with the first argument being an existing structure and just specify the parameters to change via one or multiple named arguments.
@@ -145,7 +145,7 @@ Arguments:
                 + MethodPropagateIterativ (default): Angulare spectrum propagation accounting from wrap-around problems in each propagation step by applying a perfectly matched layer (PML).
                 + MethodShell: Angulare spectrum propagation with a slightly different calculation order. This version does NOT account for wrap around problems yielding problems at larger out-of-focus distances
                 + MethodSincR: Based on first calculating a SincR function in real space and applying consecutive filtering steps. It accounts for wrap around problems but requires a quite high sampling along the Z direction.
-                + MethodRW: Uses the method described in the paper by B. Richards and E. Wolf, "Electromagnetic diffraction in optical systems. II. structure of the image field in an aplanatic system," Proc. R. Soc. London A, vol. 253, no. 1274, 1959.
+                + MethodRichardsWolf: Uses the method described in the paper by B. Richards and E. Wolf, "Electromagnetic diffraction in optical systems. II. structure of the image field in an aplanatic system," Proc. R. Soc. London A, vol. 253, no. 1274, 1959.
                             The terms I0, I1 and I2 are first calculated for an radial Z-dependet profile and then interpolated onto the 3D volume.
 + aplanatic:    aplanatic factor. Provided as a function of angle θ. 
 + FFTPlan:      information on how to calculate the FFTW plan. Default: nothing (using FFTW.ESTIMATE)
@@ -162,7 +162,7 @@ julia> ppem = PSFParams(ppm; λ=0.620)
 ```
 """
 function PSFParams(λ=0.5, NA=1.2, n=1.33; pol=pol_circ, dtype=Float32, mode=ModeWidefield, 
-                    aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
+                    aplanatic = aplanatic_detection, method=MethodRichardsWolf, FFTPlan=nothing,
                     aberrations=Aberrations(), pixelshape=nothing, transition_dipole=nothing, λ_weights=nothing)
     PSFParams(λ, NA, n, dtype, mode, pol, aplanatic, method, FFTPlan, aberrations, pixelshape, transition_dipole, λ_weights)
 end

@@ -88,6 +88,21 @@ end
     pp_ex = PSFParams(pp_em; λ=0.488, aplanatic=aplanatic_illumination);
     pinhole = 0.001
     @time p_ism = psf(sz,pp_em; pp_ex=pp_ex, pinhole=pinhole, sampling=sampling);
+    pp_em_conf = PSFParams(0.5,1.3,1.52; mode=ModeConfocal);
+    @time p_conf = psf(sz,pp_em_conf; pp_ex=pp_ex, pinhole=pinhole, sampling=sampling);
+    # @test ctr_test(p_ism[13], p_conf, 0.0001)
+    @test isapprox(p_ism[13], p_conf; rtol=0.000001)
+end
+
+@testset "Two-Photon PSF" begin
+    sampling = (0.04,0.04,0.120)
+    sz = (128,128,128)
+    pp_ex = PSFParams(0.800,1.3,1.52; aplanatic=aplanatic_illumination, mode=Mode2Photon);
+    @time p_2p = psf(sz,pp_ex; sampling=sampling);
+    pp_ex = PSFParams(0.800,1.3,1.52; mode=ModeWidefield, aplanatic=aplanatic_illumination);
+    @time p_wf = psf(sz,pp_ex; sampling=sampling);
+    # @test ctr_test(p_ism[13], p_conf, 0.0001)
+    @test isapprox(p_2p, abs2.(p_wf); rtol=0.000001)
 end
 
 return

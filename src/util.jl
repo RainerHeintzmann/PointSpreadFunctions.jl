@@ -5,10 +5,10 @@ converts a complex-valued amplitude field to intensity via `abs2.` and summing o
 """
 function amp_to_int(field, pp)
     if isnothing(pp.transition_dipole)
-        sum(abs2.(field), dims=4)
+        dropdims(sum(abs2.(field), dims=4), dims=4)
     else
         transition_dipole = reorient([pp.transition_dipole...], Val(4))
-        sum(abs2.(field .* transition_dipole), dims=4)
+        dropdims(sum(abs2.(field .* transition_dipole), dims=4), dims=4)
     end
 end
 
@@ -306,7 +306,7 @@ theta_z(sz) = (zz((1,1,sz[3])) .> 0) # The direction is important due to the hig
 """
     k_0(pp::PSFParams)
 
-k in the medium as n/lambda.   (1/space units
+k in the medium as n/lambda.   (1/space units)
 
 Arguments:
 + `pp`:  PSF parameter structure
@@ -318,7 +318,7 @@ end
 """
     k_pupil(pp::PSFParams)
 
-maxim radial k-coordinate (1/space units) where the pupil ends
+maxim radial (i.e. XY-) k-coordinate (1/space units) where the pupil ends
 
 Arguments:
 + `pp`:  PSF parameter structure
@@ -330,13 +330,26 @@ end
 """
     k_dz(pp::PSFParams)
 
-relative kz range from pupil boarder to top of Ewald sphere
+relative kz range from pupil boarder to top of Ewald sphere (in 1/space units)
 
 Arguments:
 + `pp`:  PSF parameter structure
 """
 function k_dz(pp::PSFParams)
     pp.dtype((1 - cos(asin(pp.NA/ pp.n))) * k_0(pp))
+end
+
+"""
+    kz_mid_pos(sz, pp::PSFParams, sampling)
+
+    reciprocal space distance from the center, where the mid-point between top and bottom of the McCutchen pupil is.
+
+Arguments:
++ `sz`:  Size of the dataset
++ `pp`:  PSF parameter structure
+"""
+function kz_mid_pos(sz, pp::PSFParams, sampling)
+    (k_0(pp).-k_dz(pp)./2) ./ k_scale(sz, pp, sampling)[3]
 end
 
 """
@@ -367,7 +380,7 @@ end
 """
     k_0_pos(sz, pp::PSFParams, sampling)
 
-returns the X and Y position of the Ewald-sphere border in reciprocal space pixels.
+returns the X, Y and Z position of the Ewald-sphere border in reciprocal space pixels.
 
 Arguments:
 + `sz`:  size of the real-space array
@@ -552,8 +565,9 @@ function calc_with_resampling(fct, sz, sampling; norm_amp=true, dims=1:3)
     end
 
     res_small = fct(small_sz, small_sampling)
-    border_in = (0,0, ceil.(Int,sz[3]./2) ./ small_sz[3],0)
-    mywin = collect(window_hanning((1,1,small_sz[3],1), border_in=border_in, border_out=1)) # for speed reasons the collect is faster
+
+    border_in = (0,0, ceil.(Int,sz[3]./2) ./ small_sz[3])
+    mywin = collect(window_hanning((1,1,small_sz[3]), border_in=border_in, border_out=1)) # for speed reasons the collect is faster
 
     # Note that the upsampling leads to a one-pixel shift of the center for each odd-size dimension
     # This is taken care of in the select_region code below
