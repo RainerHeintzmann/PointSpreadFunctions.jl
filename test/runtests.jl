@@ -81,4 +81,13 @@ end
     @test ctr_test(pc_open, pw_ex, 0.15)
 end
 
+@testset "ISM PSF" begin
+    sampling = (0.04,0.04,0.120)
+    sz = (128,128,128)
+    pp_em = PSFParams(0.5,1.3,1.52; mode=ModeISM);
+    pp_ex = PSFParams(pp_em; λ=0.488, aplanatic=aplanatic_illumination);
+    pinhole = 0.001
+    @time p_ism = psf(sz,pp_em; pp_ex=pp_ex, pinhole=pinhole, sampling=sampling);
+end
+
 return

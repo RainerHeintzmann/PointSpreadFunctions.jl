@@ -1,9 +1,16 @@
 """
-    amp_to_int(field) 
+    amp_to_int(field, pp) 
 
 converts a complex-valued amplitude field to intensity via `abs2.` and summing over the 4th dimension.
 """
-amp_to_int(field) = sum(abs2.(field), dims=4)
+function amp_to_int(field, pp)
+    if isnothing(pp.transition_dipole)
+        sum(abs2.(field), dims=4)
+    else
+        transition_dipole = reorient([pp.transition_dipole...], Val(4))
+        sum(abs2.(field .* transition_dipole), dims=4)
+    end
+end
 
 """
     has_z_symmetry(pp::PSFParams)
@@ -177,7 +184,7 @@ end
 """
     jinc_r_2d(sz::NTuple, diameter=(1.0,1.0), dtype=Float32)
 
-calculates a jinc(abs(position)) function in 2D such that its Fourier transform corresponds to the disk-shaped pupil of `diameter` which is a Tuple of both long axes diameters.
+calculates a jinc(abs(position)) function in 2D such that its inverse Fourier transform corresponds to the disk-shaped pupil of `diameter` which is a Tuple of both long axes diameters.
 `dtype` specifies the destination type. Note that the result is normalized such that the disk as obtained by an inverse Fourier transformation is filled with a value of `1.0`.
 
 See also:
@@ -202,13 +209,65 @@ function jinc_r_2d(sz::NTuple, diameter=(1.0,1.0), dtype=Float32; r_func=rr)
 end
 
 """
+    sinc_r_2d(sz::NTuple, side_length=(1.0,1.0), dtype=Float32)
+
+calculates a sinc(abs(position)) function in 2D such that its inverse Fourier transform corresponds to the box-shaped pupil of `diameter` which is a Tuple of both long axes diameters.
+`dtype` specifies the destination type. Note that the result is normalized such that the disk as obtained by an inverse Fourier transformation is filled with a value of `1.0`.
+
+See also:
++ sinc_r()
+
+# Example
+```jdoctest
+julia> using PSFs, View5D
+
+julia> sz = (100,100);d=20.0; w=jinc_r_2d(sz,d); 
+
+julia> q = sinc_r_2d(sz, d; r_func=PSFs.rr_rfft); # a version in RFFT space
+
+julia> @vt rr(sz) .< d/2.0 real.(ift(w)) fftshift(irfft(q,sz[1]))
+```
+"""
+function sinc_r_2d(sz::NTuple, side_length=(1.0,1.0), dtype=Float32)
+    side_length = (1,1) .* side_length
+    scale = side_length./sz[1:2]
+    sfac = (pi/4).*prod(side_length)
+    sfac .* sinc.(xx_rfft(dtype, sz[1:2], scale=scale)) .* sinc.(yy_rfft(dtype, sz[1:2], scale=scale))
+end
+
+"""
+    to_rfft_pos(fct, dtype, sz; scale=1.0)
+
+converts an IdxFunArray function such that it works for rft arrays. 
+"""
+function to_rfft_pos(fct, dtype, sz; scale=1.0)
+    sz = rfft_size(sz)
+    ifftshift(fct(dtype, sz, offset=CtrRFT, scale=scale), (2:length(sz)))
+end
+
+"""
     rr_rfft(dtype, sz; scale=1.0)
     generates the positions in rfft space based on the distance to the zero coordinate. `sz` corresponds to a size of the full (inverse Fourier-transformed) array.
 
 """
-function rr_rfft(dtype, sz; scale=1.0)
+rr_rfft(dtype, sz; scale=1.0) = to_rfft_pos(rr, dtype, sz; scale=scale)
+
+"""
+    xx_rfft(dtype, sz; scale=1.0)
+    generates the positions in rfft space based on the distance to the zero coordinate. `sz` corresponds to a size of the full (inverse Fourier-transformed) array.
+
+"""
+xx_rfft(dtype, sz; scale=1.0) = to_rfft_pos(xx, dtype, sz; scale=scale)
+
+"""
+    yy_rfft(dtype, sz; scale=1.0)
+    generates the positions in rfft space based on the distance to the zero coordinate. `sz` corresponds to a size of the full (inverse Fourier-transformed) array.
+
+"""
+yy_rfft(dtype, sz; scale=1.0) = to_rfft_pos(yy, dtype, sz; scale=scale)
+
+function rfft_size(sz)
     sz = Tuple((d==1 ? sz[d].÷2+1 : sz[d] for d=1:length(sz)))
-    ifftshift(rr(dtype, sz, offset=CtrRFT, scale=scale), (2:length(sz)))
 end
 
 # my_disc(sz; rel_border=4/3, eps=0.05) = window_hanning(sz, border_in=rel_border.-eps, border_out=rel_border.+eps)
@@ -461,7 +520,7 @@ end
 + `norm_amp`:  decides whether amplitude or intensity is normalized to account for the size change
 
 """
-function calc_with_resampling(fct, sz, sampling; norm_amp=true)
+function calc_with_resampling(fct, sz, sampling; norm_amp=true, dims=1:3)
     # ensure that the data is at least 3D
     sz, sampling, is2d = let 
         if length(sz)>2
@@ -498,7 +557,7 @@ function calc_with_resampling(fct, sz, sampling; norm_amp=true)
 
     # Note that the upsampling leads to a one-pixel shift of the center for each odd-size dimension
     # This is taken care of in the select_region code below
-    res = upsample2(res_small .* mywin, fix_center=true, keep_singleton=true)
+    res = upsample2(res_small .* mywin, fix_center=true, keep_singleton=true, dims=dims)
     res = let
         if is2d
             dropdims(res, dims=3)

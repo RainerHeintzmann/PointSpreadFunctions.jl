@@ -1,8 +1,10 @@
 abstract type PSFMode end
 struct ModeWidefield <: PSFMode end
 struct ModeConfocal <: PSFMode end
+struct ModeISM <: PSFMode end
+struct Mode2Photon <: PSFMode end
 struct Mode4Pi <: PSFMode end
-struct STED <: PSFMode end
+struct ModeSTED <: PSFMode end
 
 abstract type PSFMethod end
 struct MethodSincR <: PSFMethod end
@@ -119,12 +121,14 @@ struct PSFParams
     FFTPlan # if not nothing this will be the plan of how to perform FFTs
     aberrations 
     pixelshape # here functions can be supplied, which account for the pixelshape influence (itegration over pixel size).
+    transition_dipole # a value of `nothing` means that the total power is summed over X, Y and Z. Otherwise a 3D tuple of values needs to be supplied.
+    λ_weights # `nothing` means that only a single wavelength is calculated. Otherwise a tuple of lambdas and wavelengths needs to be supplied.
 end
 
 """
-    PSFParams(λ=0.5, NA=1.2, n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
+    PSFParams(λ=0.5, NA=1.2, n=1.33; pol=pol_circ, dtype=Float32, mode=ModeWidefield, 
     aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
-    aberrations=Aberrations(), pixelshape=nothing)
+    aberrations=Aberrations(), pixelshape=nothing, transition_dipole=nothing, λ_weights=nothing)
 
 creates the PSFParams structure via this constructor. You can also call `PSFParams` with the first argument being an existing structure and just specify the parameters to change via one or multiple named arguments.
 
@@ -134,43 +138,45 @@ Arguments:
 + n:            refractive index of the embedding AND immersion medium
 + pol: a function calculating the polarization from a given Tuple of relative-k pupil vectors
 + dtype:        real-valued data type to generate PSF for
-+ mode:         microscopy mode to calculate PSF for ::PSFMode. Currently only `ModeWidefield` is implemented
++ mode:         microscopy mode to calculate PSF for ::PSFMode. 
 + method:         microscopy mode to calculate PSF for 
                 valid options are currently:
                 + MethodPropagate: Angulare spectrum propagation. This version does NOT account for wrap around problems yielding problems at larger out-of-focus distances
                 + MethodPropagateIterativ (default): Angulare spectrum propagation accounting from wrap-around problems in each propagation step by applying a perfectly matched layer (PML).
                 + MethodShell: Angulare spectrum propagation with a slightly different calculation order. This version does NOT account for wrap around problems yielding problems at larger out-of-focus distances
                 + MethodSincR: Based on first calculating a SincR function in real space and applying consecutive filtering steps. It accounts for wrap around problems but requires a quite high sampling along the Z direction.
+                + MethodRW: Uses the method described in the paper by B. Richards and E. Wolf, "Electromagnetic diffraction in optical systems. II. structure of the image field in an aplanatic system," Proc. R. Soc. London A, vol. 253, no. 1274, 1959.
+                            The terms I0, I1 and I2 are first calculated for an radial Z-dependet profile and then interpolated onto the 3D volume.
 + aplanatic:    aplanatic factor. Provided as a function of angle θ. 
 + FFTPlan:      information on how to calculate the FFTW plan. Default: nothing (using FFTW.ESTIMATE)
-
++ transition_dipole  If supplied a transition-dipole (e.g. sqrt(2) .* (0.0,1.0,1.0)) will be accounted for in the PSF calculation. If not normalized, the strength will be included.
 Example:
 ```jdoctest
 julia> using FFTW, PSFs
 
-julia> ppm = PSFParams(0.58, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodSincR, aberrations= Aberrations(), FFTPlan=FFTW.MEASURE)
+julia> ppm = PSFParams(0.58, 1.4, 1.518;pol=pol_circ,method=PSFs.MethodSincR, aberrations= Aberrations(), FFTPlan=FFTW.MEASURE)
 PSFParams(0.58, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodSincR, 0x00000000, nothing, nothing)
 
 julia> ppem = PSFParams(ppm; λ=0.620)
 
 ```
 """
-function PSFParams(λ=0.5, NA=1.2, n=1.33; pol=pol_scalar, dtype=Float32, mode=ModeWidefield, 
+function PSFParams(λ=0.5, NA=1.2, n=1.33; pol=pol_circ, dtype=Float32, mode=ModeWidefield, 
                     aplanatic = aplanatic_detection, method=MethodPropagateIterative, FFTPlan=nothing,
-                    aberrations=Aberrations(), pixelshape=nothing)
-    PSFParams(λ, NA, n, dtype, mode, pol, aplanatic, method, FFTPlan, aberrations, pixelshape)
+                    aberrations=Aberrations(), pixelshape=nothing, transition_dipole=nothing, λ_weights=nothing)
+    PSFParams(λ, NA, n, dtype, mode, pol, aplanatic, method, FFTPlan, aberrations, pixelshape, transition_dipole, λ_weights)
 end
 
 """
     PSFParams(pp; λ=pp.λ, NA=pp.NA, n=pp.n,  pol=pp.polarization, dtype=pp.dtype, mode=pp.mode, 
         aplanatic = pp.aplanatic, method=pp.method, FFTPlan=pp.FFTPlan,
-        aberrations=pp.aberrations, pixelshape=pp.pixelshape)
+        aberrations=pp.aberrations, pixelshape=pp.pixelshape, transition_dipole=pp.transition_dipole, λ_weights=pp.λ_weights)
 
     Alternative conveniance version to construct a PSF parameter structure using an existing structure `pp` and overwriting one or multiple parameters via named arguments.
     See the other version of `PSFParams` for documentation.
 """
 function PSFParams(pp::PSFParams; λ=pp.λ, NA=pp.NA, n=pp.n,  pol=pp.polarization, dtype=pp.dtype, mode=pp.mode, 
     aplanatic = pp.aplanatic, method=pp.method, FFTPlan=pp.FFTPlan,
-    aberrations=pp.aberrations, pixelshape=pp.pixelshape)
-    PSFParams(λ, NA, n, dtype, mode, pol, aplanatic, method, FFTPlan, aberrations, pixelshape)
+    aberrations=pp.aberrations, pixelshape=pp.pixelshape, transition_dipole=pp.transition_dipole, λ_weights=pp.λ_weights)
+    PSFParams(λ, NA, n, dtype, mode, pol, aplanatic, method, FFTPlan, aberrations, pixelshape, transition_dipole, λ_weights)
 end
