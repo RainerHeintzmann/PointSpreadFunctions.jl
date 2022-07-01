@@ -360,7 +360,7 @@ end
 + `sampling`: pixelpitch in real space as NTuple
 """
 function k_scale(sz, pp::PSFParams, sampling)
-    pp.dtype.(1 ./ (sz .* sampling))
+    pp.dtype.(1 ./ (sz .* abs.(sampling)))
 end
 
 """
@@ -397,7 +397,7 @@ end
 returns an array of radial k coordinates, |k_xy|
 """
 function k_r(sz, pp::PSFParams, sampling)
-    min.(k_0(pp), rr(pp.dtype, sz[1:2],scale = k_scale(sz[1:2], pp, sampling[1:2])))
+    min.(k_0(pp), rr(pp.dtype, sz[1:2], scale = k_scale(sz[1:2], pp, sampling[1:2])))
 end
 
 """
