@@ -74,7 +74,7 @@ end
     pw_ex = psf(sz,pp_ex; sampling=sampling);
     pc2 = pw_ex .* pw_em
     # check if the confocal calculations agree for a very small pinhole
-    @test isapprox(pc ./ sum(pc), pc2./sum(pc2); rtol=0.01)
+    @test isapprox(pc ./ sum(pc), pc2./sum(pc2); rtol=0.05)
     @test isapprox(pc ./ maximum(pc), pc2./maximum(pc2); rtol=0.01)
     # test if the pinhole normalization is correct. For a very large pinhole the PSF is an excitation WF PSF
     @test ctr_test(pc_open2, pw_ex, 0.15)

@@ -34,6 +34,7 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
 
     # the pupil below does not need the 1/cos(theta) factor, since this is already in the 3D shell.
     pupil = pupil_xyz(nowrap_sz, pp, big_sampling, is_proj=false) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
+
     sinc_r_big = sinc_r(nowrap_sz,pp, sampling=big_sampling) .* my_disc(nowrap_sz[1:2],pp)  # maybe this should rather already be apodized by angle?
     if !isnothing(pp.FFTPlan) 
         P3d = plan_fft(sinc_r_big, flags=pp.FFTPlan)
@@ -243,7 +244,6 @@ function apsf(::Type{MethodShell}, sz::NTuple, pp::PSFParams; sampling=nothing, 
     pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
 
     pupils = apply_kz_to_pupil(pupil, sz[3], pp, sampling=sampling)
-    @show eltype(pupils)
     if center_kz
         _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling)
         pupils .*= cispi.((-2*rel_kz/sz[3]) .* zz((1,1,sz[3]))) # centers the McCutchen pupil to be able to correctly resample it along kz
@@ -340,7 +340,7 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
 
         z_pos = z - (sz[3]÷2+1)
 
-        rel_phase = center_kz ? Complex{pp.dtype}(cispi.((-2*rel_kz/sz[3]) .* z_pos)) : pp.dtype(0) # centers the McCutchen pupil to be able to correctly resample it along kz
+        rel_phase = center_kz ? Complex{pp.dtype}(cispi.((-2*rel_kz/sz[3]) .* z_pos)) : one(pp.dtype) # centers the McCutchen pupil to be able to correctly resample it along kz
     
         if pp.polarization == pol_x
             E[:,:,z,1] .= rel_phase .* ((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
