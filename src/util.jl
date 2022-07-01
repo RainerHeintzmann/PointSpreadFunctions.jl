@@ -109,7 +109,7 @@ returns the required minimum sampling for the calculation of a full Ewald sphere
 function get_Ewald_sampling(sz::NTuple, pp::PSFParams)
     s_xyz = pp.λ ./ (2 .* pp.n) 
     sz2 = sz .÷ 2
-    s_xyz .* (sz2.-2) ./ sz2 # provide a minimum amount of oversampling to avoid problems with the border pixesl.
+    pp.dtype.(s_xyz .* (sz2.-2) ./ sz2) # provide a minimum amount of oversampling to avoid problems with the border pixesl.
 end
 
 
@@ -567,7 +567,7 @@ function calc_with_resampling(fct, sz, sampling; norm_amp=true, dims=1:3)
     res_small = fct(small_sz, small_sampling)
 
     border_in = (0,0, ceil.(Int,sz[3]./2) ./ small_sz[3])
-    mywin = collect(window_hanning((1,1,small_sz[3]), border_in=border_in, border_out=1)) # for speed reasons the collect is faster
+    mywin = collect(window_hanning(real(eltype(res_small)),(1,1,small_sz[3]), border_in=border_in, border_out=1)) # for speed reasons the collect is faster
 
     # Note that the upsampling leads to a one-pixel shift of the center for each odd-size dimension
     # This is taken care of in the select_region code below
@@ -582,9 +582,9 @@ function calc_with_resampling(fct, sz, sampling; norm_amp=true, dims=1:3)
     # account for the brightness change during rescaling. Only the lateral sizes matter.
     scale = let 
         if norm_amp
-           sqrt(prod(size(res_small)[1:2]) / prod(size(res)[1:2]))
+           real(eltype(res))(sqrt(prod(size(res_small)[1:2]) / prod(size(res)[1:2])))
         else
-           prod(size(res_small)[1:2]) / prod(size(res)[1:2])
+            real(eltype(res))(prod(size(res_small)[1:2]) / prod(size(res)[1:2]))
         end        
     end
     # select the appropriate wanted size

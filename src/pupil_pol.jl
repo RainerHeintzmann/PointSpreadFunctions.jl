@@ -20,7 +20,7 @@ This version still includes a (scalar) phase spiral.
 This is a lot faster but not as accurate.
 """
 function pol_scalar_spiral(T, xypos) # e.g. for STED microscopy
-    cis.(atan(xypos...))
+    cis.(atan(T.(xypos...)))
 end
 
 """
@@ -30,7 +30,7 @@ assumes x-polarization in illumination or an x-oriented polarizer in detection.
 In a high-NA objective this is converted into XYZ electric fields at the focus.
 """
 function pol_x(T, xypos)
-    (one(T),zero(T))
+    (one(T), zero(T))
 end
 
 """
@@ -50,7 +50,7 @@ assumes circular polarization in illumination or an x-oriented polarizer in dete
 In a high-NA objective this is converted into XYZ electric fields at the focus.
 """
 function pol_circ(T, xypos)
-    (one(T)/sqrt(2)+0im, one(T)/sqrt(2)*1im)
+    (one(T)/sqrt(T(2))+T(0)im, one(T)/sqrt(T(2))*T(1)im)
 end
 
 """
@@ -60,7 +60,7 @@ assumes circular polarization in illumination or an x-oriented polarizer in dete
 This version includes phase spiral defining the local (xypos-dependent) phase of both x and y polarization.
 """
 function pol_circ_spiral(T, xypos) # e.g. for STED microscopy
-    pol_circ(T, xypos) .* cis.(atan(xypos...))
+    pol_circ(T, xypos) .* cis.(atan(T.(xypos...)))
 end
 
 

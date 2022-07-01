@@ -52,6 +52,7 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
             shell = circshift(shell, (0,0,-rel_kz)) # needed for subsequent upsampling along kz
         end
     end
+
     # shell, sampling =  limit_kz(theta_z(nowrap_sz) .* ft(sinc_r_big, (1,2,3)), pp, sampling) # remove negative frequencies and limit to useful range
 
     # check_amp_sampling_sincr(nowrap_sz, pp, sampling)
@@ -63,6 +64,7 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
     end
 
     res=ift2d(pupils) # This should really be a zoomed iFFT
+
     # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
     return normalize_amp_to_plane(select_region(res, new_size=sz[1:3])) # extract the central bit, which avoids the wrap-around effects
     # , sampling
@@ -222,11 +224,11 @@ function apply_kz_to_pupil(pupil, z_planes, pp; sampling)
         sampling = get_Ewald_sampling(sz, pp)
     end
     k_max_rel = sampling[1:2] ./ (pp.λ / pp.n)
-    scalar = (2π*sampling[3] / (pp.λ / pp.n))
+    scalar = pp.dtype((2π*sampling[3] / (pp.λ / pp.n)))
     xy_scale = 1 ./ (k_max_rel .* sz[1:2])
     sqrt_term = phase_kz(pp.dtype, sz[1:2], scale = xy_scale)
     prop_phase = scalar .* sqrt_term    
-    pupils = pupil .* cis.(zz((1,1,z_planes)) .* prop_phase) # if you fourier-transform this along kz you should get the shifted pupil
+    pupils = pupil .* cis.(zz(pp.dtype,(1,1,z_planes)) .* prop_phase) # if you fourier-transform this along kz you should get the shifted pupil
     return pupils
 end
 
@@ -241,6 +243,7 @@ function apsf(::Type{MethodShell}, sz::NTuple, pp::PSFParams; sampling=nothing, 
     pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
 
     pupils = apply_kz_to_pupil(pupil, sz[3], pp, sampling=sampling)
+    @show eltype(pupils)
     if center_kz
         _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling)
         pupils .*= cispi.((-2*rel_kz/sz[3]) .* zz((1,1,sz[3]))) # centers the McCutchen pupil to be able to correctly resample it along kz

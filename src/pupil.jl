@@ -13,7 +13,7 @@ end
 limits the maximum angle to the theoretical theta. This is particularly important for the 1/sqrt(cos θ) aplanatic factor as this factor diverges and wins over the roundoff errors of the smooth pupil.
 """
 function limit_θ(theta, pp)
-    min.(theta, asin(pp.NA/pp.n))
+    min.(theta, asin(pp.dtype(pp.NA/pp.n)))
 end
 
 """
