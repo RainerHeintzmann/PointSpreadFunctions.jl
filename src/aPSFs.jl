@@ -34,8 +34,10 @@ function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, 
 
     # the pupil below does not need the 1/cos(theta) factor, since this is already in the 3D shell.
     pupil = pupil_xyz(nowrap_sz, pp, big_sampling, is_proj=false) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
-
+    
+    # relatively expensive
     sinc_r_big = sinc_r(nowrap_sz,pp, sampling=big_sampling) .* my_disc(nowrap_sz[1:2],pp)  # maybe this should rather already be apodized by angle?
+
     if !isnothing(pp.FFTPlan) 
         P3d = plan_fft(sinc_r_big, flags=pp.FFTPlan)
     end
@@ -115,6 +117,7 @@ function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothi
     # the pupil below is the ft of a jinc in real space and includes a factor of my_disc(sz[1:2],pp) to reduce wrap around
     pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
     pupils = apply_propagators(pupil, sz[3], pp, sampling=sampling)
+
     # return pupils
     # pupils .*= window_hanning((1,1,size(pupils,3)),border_in=0.8,border_out=1.0,dims=(3,))
     if center_kz
@@ -150,7 +153,7 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
         prop_pupil .*= cispi(-2*rel_kz/psz[3])
     end
     border_in = 1.0 .- PMLsz[1:2] ./ psz[1:2]
-    real_window = exp.(1.75 .* (window_linear(size(start_pupil)[1:2],border_in=border_in,border_out=1) .-1))  # This is maybe not the best PML?
+    real_window = collect(exp.(1.75 .* (window_linear(size(start_pupil)[1:2],border_in=border_in,border_out=1) .-1)))  # This is maybe not the best PML?
     # real_window = window_gaussian(size(start_pupil)[1:2], border_in=border_in,border_out=border_in.*0.5 .+ 0.5)  # This is maybe not the best PML?
     # real_window = window_hanning(size(start_pupil)[1:2],border_in=border_in,border_out=1)
     prop_pupil = conj(prop_pupil) # from now the advancement is in the opposite direction
@@ -162,16 +165,19 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
     end
     pupil = start_pupil
     for z in start_z:-1:2 # from the middle to the start
-        slice = ift2d(pupil) # should be ifft2d for speed reasons
-        dst = @view slices[:,:,z:z,:]
-        select_region!(slice, dst, new_size=sz[1:2])
+        slice = collect(ift2d(pupil)) # should be ifft2d for speed reasons
+        # dst = @view slices[:,:,z:z,:]
+        # writes the slice into the destination arry in slices
+        # select_region!(slice, dst, new_size=sz[1:2])
+        slices[:,:,z:z,:] .= select_region_view(slice,  new_size=sz[1:2])
         pupil = ft2d(slice .* real_window)
         pupil .*= prop_pupil 
     end
-    dst = @view slices[:,:,1:1,:]
-    select_region!(ift2d(pupil), dst, new_size=sz[1:2])
+    slices[:,:,1:1,:] .= select_region_view(collect(ift2d(pupil)),  new_size=sz[1:2])
+    # dst = @view slices[:,:,1:1,:]
+    # select_region!(ift2d(pupil), dst, new_size=sz[1:2])
 
-    # the check below is disabled for now, since there needs to be also an XY-flip to be correct
+    # Does it need also an XY-flip to be correct?
     if false # has_z_symmetry(pp) # to save some speed
         dz = sz[3] - (start_z+1)
         # missing XY-flip:
@@ -180,14 +186,12 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
         prop_pupil = conj(prop_pupil) # from now the advancement is in the opposite direction
         pupil = start_pupil .* prop_pupil
         for z in start_z+1:sz[3]-1  # from the middle forward
-            slice = ift2d(pupil)
-            dst = @view slices[:,:,z:z,:]
-            select_region!(slice, dst, new_size=sz[1:2])
+            slice = collect(ift2d(pupil))
+            slices[:,:,z:z,:] .= select_region_view(slice,  new_size=sz[1:2])
             pupil = ft2d(slice .* real_window)
             pupil .*= prop_pupil 
         end
-        dst = @view slices[:,:,sz[3]:sz[3],:]
-        select_region!(ift2d(pupil), dst, new_size=sz[1:2])
+        slices[:,:,sz[3]:sz[3],:] .= select_region_view(collect(ift2d(pupil)),  new_size=sz[1:2])
     end        
     return slices
 end

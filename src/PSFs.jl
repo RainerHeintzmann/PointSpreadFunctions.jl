@@ -84,7 +84,7 @@ julia> pp_ex = PSFParams(pp_em; λ=0.488, aplanatic=aplanatic_illumination);
 julia> p_conf = psf((128,128,128),pp_em; pp_ex=pp_ex, pinhole=0.1, sampling=(0.040,0.040,0.100));
 ```
 """
-function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, pinhole=nothing, pinhole_ft=disc_pinhole_ft, sampling=nothing, use_resampling=true, return_amp=nothing, pinhole_positions=[(0.0,0.0)], ex2p=false) # unclear why the resampling seems to be so bad
+function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; sampling=nothing, pp_ex=nothing, use_resampling=true, pinhole=nothing, pinhole_ft=disc_pinhole_ft,  return_amp=nothing, pinhole_positions=[(0.0,0.0)], ex2p=false) # unclear why the resampling seems to be so bad
     if isnothing(pp_ex) 
         error("The named parameter `pp_ex` is obligatory for confocal calculation. Provide the excitation PSF parameters here.")
     end
@@ -123,27 +123,63 @@ function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, 
         end
     end
 
-    # now we need to modify the sampling such that the pinhole corrsponds to the equivalent of one Airy Unit.
+    pinhole_pix = pinhole_AU_to_pix(sz, pp_em, sampling, pinhole)
+    return confocal_int(psf_ex, psf_em, pp_em; pinhole_pix=pinhole_pix, pinhole_ft=pinhole_ft, pinhole_positions=pinhole_positions, ex2p=ex2p)
+end
+
+"""
+    pinhole_AU_to_pix(sz, pp_em, sampling)
+
+returns the pinhole in AU. Also checks if the pinhole is too big.
+"""
+function pinhole_AU_to_pix(sz, pp_em, sampling, pinhole)
+     # now we need to modify the sampling such that the pinhole corrsponds to the equivalent of one Airy Unit.
     # The Airy Unit is the diameter of the Airy disc: 1.22 * lamda_em / NA 
     # AU = 1.22 * pp_em.λ / pp_em.NA
-    AU_pix = AU_per_pixel(pp_em, sampling) # AU ./ sampling[1:2]
-    if any(pinhole .* AU_pix .> sz[1:2]) 
-        @warn "Pinhole is larger than image this leads to serious aliasing artefacts. Maximal pinhole size is: $(sz[1:2]./AU_pix) AU."
+    if isnothing(pinhole)
+        return nothing
     end
+    AU_pix = AU_per_pixel(pp_em, sampling) # AU ./ sampling[1:2]
+    pinhole_in_AU = pinhole .* AU_pix
+    if any(pinhole_in_AU .> sz[1:2]) 
+        @warn "Pinhole is larger than image this leads to serious aliasing artefacts. Maximal pinhole size is: $(sz[1:2]./AU_pix) AU. Assuming fully open pinhole."
+        return nothing
+    end
+    return pinhole_in_AU
+end
+
+"""
+    confocal_int(psf_ex, psf_em, pinhole=nothing, pinhole_ft=disc_pinhole_ft, sampling=nothing, use_resampling=true, return_amp=nothing, pinhole_positions=[(0.0,0.0)], ex2p=false)
+
+helper function to calculate the confocal detection, once the excitation and emission PSFs and pinhole parameters are defined. Two photon excitation and ISM detection are also included.
+"""
+function confocal_int(psf_ex, psf_em, pp_em;  pinhole_pix=nothing, pinhole_ft=disc_pinhole_ft, pinhole_positions=[(0.0,0.0)], ex2p=false)
+   
     # This can be done a lot more efficiently by staying in Fourier space. Ideally even by only calculating half the range of the jinc function:
     # pinhole = real.(ift2d(jinc_r_2d(sz, pinhole .* AU_pix, pp_em.dtype)))
     # pinhole_ft = rfft2d(ifftshift(pinhole))
 
     all_PSFs = [];
+    sz = size(psf_em)
+
+    # apply two-photon effect
+    if ex2p
+        psf_ex = abs2.(psf_ex)
+    end
 
     rfft_psf_em = rfft2d(psf_em)
     for p in pinhole_positions
-        my_pinhole_ft = exp_ikx_rfft(pp_em.dtype,sz, shift_by=p) .* pinhole_ft(sz, pp_em, pinhole.* AU_pix)
-        # pinhole_ft = rfft2d(ifftshift(pinhole))
-        # return pinhole_ft
-        my_em =  irfft2d(rfft_psf_em .* my_pinhole_ft, sz[1])
-        push!(all_PSFs, my_em .* psf_ex)
-        # push!(all_PSFs, irfft2d(my_pinhole_ft, sz[1]))  # only for diagnostic purposes
+        if isnothing(pinhole_pix)
+            # fully open pinhole assumed. The integral over all emission PSFs should really be one!
+            push!(all_PSFs, psf_ex)
+        else
+            my_pinhole_ft = exp_ikx_rfft(eltype(psf_em),sz, shift_by=p) .* pinhole_ft(sz, pp_em, pinhole_pix)
+            # pinhole_ft = rfft2d(ifftshift(pinhole))
+            # return pinhole_ft
+            my_em =  irfft2d(rfft_psf_em .* my_pinhole_ft, sz[1])
+            push!(all_PSFs, my_em .* psf_ex)
+            # push!(all_PSFs, irfft2d(my_pinhole_ft, sz[1]))  # only for diagnostic purposes
+        end
     end
 
     if length(all_PSFs) == 1
@@ -264,12 +300,96 @@ julia> pp_ex = PSFParams(0.8,1.4,1.52; mode=Mode2Photon, aplanatic= aplanatic_il
 julia> p_2p = psf(sz,pp_ex; sampling=sampling);
 ```
 """
-function psf(::Type{Mode2Photon}, sz::NTuple, pp::PSFParams; pinhole=nothing, sampling=nothing, pinhole_ft=box_pinhole_ft, pinhole_positions=nothing, args...)
+function psf(::Type{Mode2Photon}, sz::NTuple, pp::PSFParams; sampling=nothing, pinhole=nothing, pinhole_ft=disc_pinhole_ft, pinhole_positions=nothing, args...)
     if isnothing(pinhole) 
         return abs2.(psf(ModeWidefield, sz, pp; sampling=sampling))
     else
         psf(ModeConfocal, sz, pp; ex_2p=true, pinhole=pinhole, sampling=sampling, pinhole_ft=pinhole_ft,pinhole_positions=pinhole_positions, args...) # confocal is able to handle this well
     end
+end
+
+"""
+    psf(::Type{Mode4Pi}, sz::NTuple, pp_ex::PSFParams; pp_em=nothing, pinhole=nothing, sampling=nothing, pinhole_ft=disc_pinhole_ft, args...)
+    Calculates a 4Pi point spread function. 
+    Returns the PSF or a vector of PSFs.
+    
+#Parameters
++ `sz`:         size tuple of the final PSF
++ `pp_ex`:      PSF parameters of the excitation PSF. This should include the exission wavelength (typically in the IR region). Please make sure to also set `pp.aplanatic=aplanatic_illumination`.
++ `pp_ex2`:     PSF parameters of the other side excitation PSF. If `nothing` is provided, the same excitation psf parameters and aberrations, are assumed.
++ `ex2p=true`:  If `true`, two-photon exciation is assumed.
++ `pp`:         PSF parameters of the emission PSF. This only needs to be supplied, if a pinhole is used.
++ `pp_em2`:     PSF parameters of the other side emission PSF. If `nothing is supplied, Type A 4Pi microscopy is assumed with single-sided (or incoherent) detection.`
++ `pinhole=nothing`:   If `nothing`, NDD is assumed and the PSF is only the square of the excitation PSF. The diameter of each pinhole in Airy Units (AU = 1.22 λ/NA). 
++ `sampling=nothing`:   The sampling parameters of the resulting PSF.
++ `pinhole_positions=nothing`:  A list of pinhole positions. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs.
+
+```jdoctest
+julia> sampling = (0.04,0.04,0.04)
+julia> sz = (128,128,128)
+julia> pp_em = PSFParams(0.5,1.3,1.52; mode=Mode4Pi, pol=pol_x);
+julia> pp_ex = PSFParams(0.800,1.3,1.52; aplanatic=aplanatic_illumination, mode=ModeWidefield, pol=pol_x);
+julia> @time p_4pi = psf(sz,pp_em; pp_ex=pp_ex, sampling=sampling, pinhole=2.0);
+```
+"""
+function psf(::Type{Mode4Pi}, sz::NTuple, pp::PSFParams; sampling=nothing, pp_ex=nothing, pp_ex2=pp_ex, pp_em2=nothing, rel_ex_phase = 0.0, rel_em_phase = 0.0, pinhole=nothing, pinhole_ft=disc_pinhole_ft, pinhole_positions=[(0.0,0.0)], ex2p=false)
+    if isnothing(pp_ex)
+        error("For a 4Pi PSF, you have to at least provide one excitation psf using the named argument `pp_ex`.")
+    end
+    
+    if ex2p
+        Nq_ex = (pp_ex.λ/2) /pp_ex.NA / 2
+        Nq_em = pp.λ /pp_ex.NA / 2
+        Nq_XY = 1/(1/Nq_ex + 1/Nq_em)
+        Nq_ex = (pp_ex.λ/2) /pp_ex.n / 2
+        Nq_em = pp.λ /pp_ex.n / 2
+        Nq_Z = 1/(1/Nq_ex + 1/Nq_em)
+        if isnothing(sampling)
+            sampling = (Nq_XY,Nq_XY,Nq_Z)
+            @warn "Result sampling was calculated to be $(sampling)."
+        else
+            if sampling[3] > Nq_Z 
+                @warn "The 4Pi PSF needs to be sampled at least at $(Nq_Z), but sampling is $(sampling[3])."
+            end
+        end
+    else
+        Nq_ex = pp_ex.λ /pp_ex.NA / 2
+        Nq_em = pp.λ /pp_ex.NA / 2
+        Nq_XY = 1/(1/Nq_ex + 1/Nq_em)
+        Nq_ex = pp_ex.λ /pp_ex.n / 2
+        Nq_em = pp.λ /pp_ex.n / 2
+        Nq_Z = 1/(1/Nq_ex + 1/Nq_em)
+        if isnothing(sampling)
+            sampling = (Nq_XY,Nq_XY,Nq_Z)
+            @warn "Result sampling was calculated to be $(sampling)."
+        else
+            if sampling[3] > Nq_Z
+                @warn "The 4Pi PSF needs to be sampled at least at $(Nq_Z), but sampling is $(sampling[3])."
+            end
+        end
+    end
+    asf_ex1 = apsf(sz, pp_ex; sampling=sampling)
+    asf_ex2 = let 
+        if isnothing(pp_ex2)
+            conj(asf_ex1)
+        else
+            conj.(apsf(sz,pp_ex; sampling=sampling))
+        end        
+    end
+    psf_ex = amp_to_int(asf_ex1 .+ exp.(1im.*pp.dtype(rel_ex_phase)) .* asf_ex2, pp_ex)
+
+    asf_em1 = apsf(sz,pp; sampling=sampling)
+    psf_em = let
+        if isnothing(pp_em2) # 4Pi type A
+            amp_to_int(asf_em1, pp)
+        else
+            asf_em2 = apsf(sz,pp_ex; sampling=sampling)
+            amp_to_int(asf_em1 .+  exp.(1im.*pp.dtype(rel_em_phase)) .*asf_em2, pp)
+        end
+    end
+
+    pinhole_pix = pinhole_AU_to_pix(sz, pp, sampling, pinhole)
+    return confocal_int(psf_ex, psf_em, pp; pinhole_pix=pinhole_pix, pinhole_ft=pinhole_ft, pinhole_positions=pinhole_positions, ex2p=ex2p)
 end
 
 

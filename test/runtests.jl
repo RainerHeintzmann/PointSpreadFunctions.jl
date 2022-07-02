@@ -12,11 +12,11 @@ function ctr_test(dat1, dat2, rtol=0.01)
 end
 
 function compare_asfs(sz, pp, sampling)
-    @time a_prop = apsf(PSFs.MethodPropagate, sz,pp, sampling=sampling);
-    @time a_sincR = apsf(PSFs.MethodSincR, sz,pp, sampling=sampling);
-    @time a_shell = apsf(PSFs.MethodShell, sz,pp, sampling=sampling);  # fast
-    @time a_iter = apsf(PSFs.MethodPropagateIterative, sz,pp, sampling=sampling);
-    @time a_RW = apsf(PSFs.MethodRichardsWolf, sz,pp, sampling=sampling);
+    @time a_prop = apsf(PSFs.MethodPropagate, sz, pp, sampling=sampling);
+    @time a_sincR = apsf(PSFs.MethodSincR, sz ,pp, sampling=sampling);
+    @time a_shell = apsf(PSFs.MethodShell, sz, pp, sampling=sampling);  # fast
+    @time a_iter = apsf(PSFs.MethodPropagateIterative, sz ,pp, sampling=sampling);
+    @time a_RW = apsf(PSFs.MethodRichardsWolf, sz, pp, sampling=sampling);
     sz_big = (512,512,128)
     @time a_prop2 = NDTools.select_region(apsf(PSFs.MethodPropagate, sz_big,pp, sampling=sampling), new_size=sz);
     @test ctr_test(a_prop, a_iter, 0.05)
@@ -103,6 +103,15 @@ end
     @time p_wf = psf(sz,pp_ex; sampling=sampling);
     # @test ctr_test(p_ism[13], p_conf, 0.0001)
     @test isapprox(p_2p, abs2.(p_wf); rtol=0.000001)
+end
+
+@testset "4Pi PSF" begin
+    sampling = (0.04,0.04,0.04)
+    sz = (128,128,128)
+    pp_em = PSFParams(0.5,1.3,1.52; mode=Mode4Pi, pol=pol_x);
+    pp_ex = PSFParams(0.800,1.3,1.52; aplanatic=aplanatic_illumination, mode=ModeWidefield, pol=pol_x);
+    @time p_4pi = psf(sz,pp_em; pp_ex=pp_ex, sampling=sampling, pinhole=2.0);
+    @test isapprox(sum(p_4pi[:,:,64]), 2.0, rtol=0.01)
 end
 
 return
