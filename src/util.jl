@@ -204,7 +204,7 @@ julia> @vt rr(sz) .< d/2.0 real.(ift(w)) fftshift(irfft(q,sz[1]))
 function jinc_r_2d(sz::NTuple, diameter=(1.0,1.0), dtype=Float32; r_func=rr)
     diameter = (1,1) .* diameter
     scale = diameter./sz[1:2]
-    sfac = (pi/4).*prod(diameter)
+    sfac = dtype.((pi/4).*prod(diameter))
     sfac .* jinc.(r_func(dtype, sz[1:2], scale=scale))
 end
 
@@ -231,7 +231,7 @@ julia> @vt rr(sz) .< d/2.0 real.(ift(w)) fftshift(irfft(q,sz[1]))
 function sinc_r_2d(sz::NTuple, side_length=(1.0,1.0), dtype=Float32)
     side_length = (1,1) .* side_length
     scale = side_length./sz[1:2]
-    sfac = (pi/4).*prod(side_length)
+    sfac = dtype.((pi/4).*prod(side_length))
     sfac .* sinc.(xx_rfft(dtype, sz[1:2], scale=scale)) .* sinc.(yy_rfft(dtype, sz[1:2], scale=scale))
 end
 

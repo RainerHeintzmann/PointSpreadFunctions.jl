@@ -280,6 +280,10 @@ end
 # The calculation is done on an RZ plane and then interpolated to a 3D volume.
 # This is probably still buggy! At least the Pupil aplanatic factor looks wrong!
 function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
+    if length(pp.aberrations.indices) > 0
+        error("The Richards & Wolf amplitude spread function calculations does currently not support aberrations. Please choose a different method.")
+    end
+
     sampling_r = min(sampling[1],sampling[2])/2.0
     diagonal = sqrt(sum(abs2.(sz[1:2] .* sampling[1:2]))) / 2.0;
     sr = ceil(Int64, diagonal/sampling_r) + 1

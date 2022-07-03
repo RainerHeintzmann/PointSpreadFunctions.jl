@@ -75,6 +75,17 @@ Here is a list of constants defining the main indices (OSA style):
 
 See also: 
 + package `ZernikePolynomials.jl`, and https://en.wikipedia.org/wiki/Zernike_polynomials
+```jdoctest
+# spherical aberration with circular detection polarisation
+julia> aberr_sp = Aberrations([Zernike_Spherical],[0.1]);
+julia> pp_sp = PSFParams(0.488, 1.4, 1.52; method=MethodPropagateIterative, aberrations= aberr_sp);
+julia> p_sp = psf(sz, pp_sp; sampling=sampling);
+
+# diagonal astigmatism wiht x-polarised detection
+julia> aberr_as = Aberrations([Zernike_VerticalAstigmatism, Zernike_ObliqueAstigmatism],[0.1, 0.1]);
+julia> pp_as = PSFParams(0.488, 1.4, 1.52; method=MethodPropagateIterative, aberrations= aberr_as, pol=pol_x);
+julia> p_as = psf(sz, pp_as; sampling=sampling);
+```
 """
 function Aberrations(indices=[],coefficients=[];index_style = :OSA)
     Aberrations(indices,coefficients,index_style)
@@ -147,7 +158,7 @@ Arguments:
                 + MethodSincR: Based on first calculating a SincR function in real space and applying consecutive filtering steps. It accounts for wrap around problems but requires a quite high sampling along the Z direction.
                 + MethodRichardsWolf: Uses the method described in the paper by B. Richards and E. Wolf, "Electromagnetic diffraction in optical systems. II. structure of the image field in an aplanatic system," Proc. R. Soc. London A, vol. 253, no. 1274, 1959.
                             The terms I0, I1 and I2 are first calculated for an radial Z-dependet profile and then interpolated onto the 3D volume.
-+ aplanatic:    aplanatic factor. Provided as a function of angle θ. 
++ aplanatic:    aplanatic factor. Provided as a function of angle θ. Choices are `aplanatic_const`, `aplanatic_detection`, `aplanatic_illumination`, `aplanatic_illumination_flux`
 + FFTPlan:      information on how to calculate the FFTW plan. Default: nothing (using FFTW.ESTIMATE)
 + transition_dipole  If supplied a transition-dipole (e.g. sqrt(2) .* (0.0,1.0,1.0)) will be accounted for in the PSF calculation. If not normalized, the strength will be included.
 Example:

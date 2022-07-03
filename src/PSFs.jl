@@ -145,7 +145,7 @@ function pinhole_AU_to_pix(sz, pp_em, sampling, pinhole)
         @warn "Pinhole is larger than image this leads to serious aliasing artefacts. Maximal pinhole size is: $(sz[1:2]./AU_pix) AU. Assuming fully open pinhole."
         return nothing
     end
-    return pinhole_in_AU
+    return pp_em.dtype.(pinhole_in_AU)
 end
 
 """
@@ -173,7 +173,7 @@ function confocal_int(psf_ex, psf_em, pp_em;  pinhole_pix=nothing, pinhole_ft=di
             # fully open pinhole assumed. The integral over all emission PSFs should really be one!
             push!(all_PSFs, psf_ex)
         else
-            my_pinhole_ft = exp_ikx_rfft(eltype(psf_em),sz, shift_by=p) .* pinhole_ft(sz, pp_em, pinhole_pix)
+            my_pinhole_ft = exp_ikx_rfft(eltype(psf_em), sz, shift_by=p) .* pinhole_ft(sz, pp_em, pinhole_pix)
             # pinhole_ft = rfft2d(ifftshift(pinhole))
             # return pinhole_ft
             my_em =  irfft2d(rfft_psf_em .* my_pinhole_ft, sz[1])
@@ -261,7 +261,7 @@ julia> pp_ex = PSFParams(pp_em; λ=0.488, aplanatic=aplanatic_illumination);
 julia> p_ism = psf(sz,pp_em; pp_ex=pp_ex, pinhole=0.21, pinhole_dist=0.2, sampling=sampling);
 ```
 """
-function psf(::Type{ModeISM}, sz::NTuple, pp_em::PSFParams; pinhole=nothing, sampling=nothing, pinhole_ft=box_pinhole_ft, pinhole_positions=nothing, pinhole_dist=0.5, pinhole_grid=(5,5), ism_pos=ism_positions_rect, args...)
+function psf(::Type{ModeISM}, sz::NTuple, pp_em::PSFParams; pinhole=nothing, sampling=nothing, pinhole_ft=box_pinhole_ft, pinhole_positions=nothing, pinhole_dist=0.12, pinhole_grid=(5,5), ism_pos=ism_positions_rect, args...)
     if isnothing(pinhole_positions) || isempty(pinhole_positions)
         #create a list of pinhole positions
         pinhole_dist = pinhole_dist .* AU_per_pixel(pp_em, sampling)
@@ -309,16 +309,16 @@ function psf(::Type{Mode2Photon}, sz::NTuple, pp::PSFParams; sampling=nothing, p
 end
 
 """
-    psf(::Type{Mode4Pi}, sz::NTuple, pp_ex::PSFParams; pp_em=nothing, pinhole=nothing, sampling=nothing, pinhole_ft=disc_pinhole_ft, args...)
+    psf(::Type{Mode4Pi}, sz::NTuple, pp_ex::PSFParams; sampling=nothing, pp_ex2=pp_ex, pp_em=nothing, pp_em2=nothing, rel_ex_phase = 0.0, rel_em_phase = 0.0, pinhole=nothing, pinhole_ft=disc_pinhole_ft, pinhole_positions=[(0.0,0.0)], ex2p=false)
     Calculates a 4Pi point spread function. 
     Returns the PSF or a vector of PSFs.
     
 #Parameters
 + `sz`:         size tuple of the final PSF
 + `pp_ex`:      PSF parameters of the excitation PSF. This should include the exission wavelength (typically in the IR region). Please make sure to also set `pp.aplanatic=aplanatic_illumination`.
-+ `pp_ex2`:     PSF parameters of the other side excitation PSF. If `nothing` is provided, the same excitation psf parameters and aberrations, are assumed.
++ `pp_ex2`:     PSF parameters of the other side excitation PSF. If `nothing` is provided, single-sided excitation (e.g. 4Pi Type B) is assumed.
 + `ex2p=true`:  If `true`, two-photon exciation is assumed.
-+ `pp`:         PSF parameters of the emission PSF. This only needs to be supplied, if a pinhole is used.
++ `pp_em`:      PSF parameters of the emission PSF. This only needs to be supplied, if a pinhole is used.
 + `pp_em2`:     PSF parameters of the other side emission PSF. If `nothing is supplied, Type A 4Pi microscopy is assumed with single-sided (or incoherent) detection.`
 + `pinhole=nothing`:   If `nothing`, NDD is assumed and the PSF is only the square of the excitation PSF. The diameter of each pinhole in Airy Units (AU = 1.22 λ/NA). 
 + `sampling=nothing`:   The sampling parameters of the resulting PSF.
@@ -328,21 +328,21 @@ end
 julia> sampling = (0.04,0.04,0.04)
 julia> sz = (128,128,128)
 julia> pp_em = PSFParams(0.5,1.3,1.52; mode=Mode4Pi, pol=pol_x);
-julia> pp_ex = PSFParams(0.800,1.3,1.52; aplanatic=aplanatic_illumination, mode=ModeWidefield, pol=pol_x);
-julia> @time p_4pi = psf(sz,pp_em; pp_ex=pp_ex, sampling=sampling, pinhole=2.0);
+julia> pp_ex = PSFParams(0.800,1.3,1.52; aplanatic=aplanatic_illumination, mode=Mode4Pi, pol=pol_x);
+julia> @time p_4pi = psf(sz,pp_ex; pp_ex2=pp_ex, pp_em=pp_em, pp_em2=pp_em, sampling=sampling, pinhole=2.0, ex2p=true);
 ```
 """
-function psf(::Type{Mode4Pi}, sz::NTuple, pp::PSFParams; sampling=nothing, pp_ex=nothing, pp_ex2=pp_ex, pp_em2=nothing, rel_ex_phase = 0.0, rel_em_phase = 0.0, pinhole=nothing, pinhole_ft=disc_pinhole_ft, pinhole_positions=[(0.0,0.0)], ex2p=false)
+function psf(::Type{Mode4Pi}, sz::NTuple, pp_ex::PSFParams; sampling=nothing, pp_ex2 = pp_ex, pp_em=nothing, pp_em2=nothing, rel_ex_phase = 0.0, rel_em_phase = 0.0, pinhole=nothing, pinhole_ft=disc_pinhole_ft, pinhole_positions=[(0.0,0.0)], ex2p=false)
     if isnothing(pp_ex)
         error("For a 4Pi PSF, you have to at least provide one excitation psf using the named argument `pp_ex`.")
     end
     
     if ex2p
         Nq_ex = (pp_ex.λ/2) /pp_ex.NA / 2
-        Nq_em = pp.λ /pp_ex.NA / 2
+        Nq_em = pp_em.λ /pp_em.NA / 2
         Nq_XY = 1/(1/Nq_ex + 1/Nq_em)
         Nq_ex = (pp_ex.λ/2) /pp_ex.n / 2
-        Nq_em = pp.λ /pp_ex.n / 2
+        Nq_em = pp_em.λ /pp_em.n / 2
         Nq_Z = 1/(1/Nq_ex + 1/Nq_em)
         if isnothing(sampling)
             sampling = (Nq_XY,Nq_XY,Nq_Z)
@@ -354,10 +354,10 @@ function psf(::Type{Mode4Pi}, sz::NTuple, pp::PSFParams; sampling=nothing, pp_ex
         end
     else
         Nq_ex = pp_ex.λ /pp_ex.NA / 2
-        Nq_em = pp.λ /pp_ex.NA / 2
+        Nq_em = pp_em.λ /pp_em.NA / 2
         Nq_XY = 1/(1/Nq_ex + 1/Nq_em)
         Nq_ex = pp_ex.λ /pp_ex.n / 2
-        Nq_em = pp.λ /pp_ex.n / 2
+        Nq_em = pp_em.λ /pp_em.n / 2
         Nq_Z = 1/(1/Nq_ex + 1/Nq_em)
         if isnothing(sampling)
             sampling = (Nq_XY,Nq_XY,Nq_Z)
@@ -369,27 +369,27 @@ function psf(::Type{Mode4Pi}, sz::NTuple, pp::PSFParams; sampling=nothing, pp_ex
         end
     end
     asf_ex1 = apsf(sz, pp_ex; sampling=sampling)
-    asf_ex2 = let 
+    psf_ex = let 
         if isnothing(pp_ex2)
-            conj(asf_ex1)
+            amp_to_int(asf_ex1, pp_ex)
         else
-            conj.(apsf(sz,pp_ex; sampling=sampling))
+            asf_ex2 = (pp_ex == pp_ex2) ? asf_ex1 : apsf(sz,pp_ex2; sampling=sampling)
+            amp_to_int(asf_ex1 .+ exp.(1im.*pp_ex.dtype(rel_ex_phase)) .* conj.(asf_ex2), pp_ex2)
         end        
     end
-    psf_ex = amp_to_int(asf_ex1 .+ exp.(1im.*pp.dtype(rel_ex_phase)) .* asf_ex2, pp_ex)
 
-    asf_em1 = apsf(sz,pp; sampling=sampling)
+    asf_em1 = apsf(sz,pp_em; sampling=sampling)
     psf_em = let
         if isnothing(pp_em2) # 4Pi type A
             amp_to_int(asf_em1, pp)
-        else
-            asf_em2 = apsf(sz,pp_ex; sampling=sampling)
-            amp_to_int(asf_em1 .+  exp.(1im.*pp.dtype(rel_em_phase)) .*asf_em2, pp)
+        else # 4Pi type C
+            asf_em2 = (pp_em == pp_em2) ? asf_em1 : apsf(sz,pp_em2; sampling=sampling)
+            amp_to_int(asf_em1 .+  exp.(1im.*pp_em.dtype(rel_em_phase)) .* conj.(asf_em2), pp_em2)
         end
     end
 
-    pinhole_pix = pinhole_AU_to_pix(sz, pp, sampling, pinhole)
-    return confocal_int(psf_ex, psf_em, pp; pinhole_pix=pinhole_pix, pinhole_ft=pinhole_ft, pinhole_positions=pinhole_positions, ex2p=ex2p)
+    pinhole_pix = pinhole_AU_to_pix(sz, pp_em, sampling, pinhole)
+    return confocal_int(psf_ex, psf_em, pp_em; pinhole_pix=pinhole_pix, pinhole_ft=pinhole_ft, pinhole_positions=pinhole_positions, ex2p=ex2p)
 end
 
 
