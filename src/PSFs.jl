@@ -381,7 +381,7 @@ function psf(::Type{Mode4Pi}, sz::NTuple, pp_ex::PSFParams; sampling=nothing, pp
     asf_em1 = apsf(sz,pp_em; sampling=sampling)
     psf_em = let
         if isnothing(pp_em2) # 4Pi type A
-            amp_to_int(asf_em1, pp)
+            amp_to_int(asf_em1, pp_em)
         else # 4Pi type C
             asf_em2 = (pp_em == pp_em2) ? asf_em1 : apsf(sz,pp_em2; sampling=sampling)
             amp_to_int(asf_em1 .+  exp.(1im.*pp_em.dtype(rel_em_phase)) .* conj.(asf_em2), pp_em2)
