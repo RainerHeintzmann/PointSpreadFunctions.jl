@@ -182,6 +182,15 @@ function jinc_r_2d(sz::NTuple, pp::PSFParams; sampling=nothing)
 end
 
 """
+    get_pupil_aperture(sz::NTuple, pp::PSFParams, sampling)
+
+just a convenient function for demonstration purposes.
+"""
+function get_pupil_aperture(sz::NTuple, pp::PSFParams, sampling)
+    ft(jinc_r_2d(sz,pp;sampling=sampling))
+end
+
+"""
     jinc_r_2d(sz::NTuple, diameter=(1.0,1.0), dtype=Float32)
 
 calculates a jinc(abs(position)) function in 2D such that its inverse Fourier transform corresponds to the disk-shaped pupil of `diameter` which is a Tuple of both long axes diameters.

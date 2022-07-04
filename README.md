@@ -3,6 +3,7 @@ Toolbox for calculating optical PSFs. It incorporates aberrations (specified tho
 models for calculation (`PSFs.MethodSincR`, `PSFs.MethodPropagate`, `PSFs.MethodPropagateIterative`), some are faster and some more accurate.
 
 For detailed documentation, see the docs/dev (or docs/stable) link below.
+You may also find the file `PSFs_demo.ipnb` in the examples folder helpful.
 
 ## Installation
 To get the latest stable release of PSFs.jl type `]` in the Julia REPL:
