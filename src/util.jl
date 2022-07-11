@@ -1,7 +1,12 @@
 """
     amp_to_int(field, pp) 
 
-converts a complex-valued amplitude field to intensity via `abs2.` and summing over the 4th dimension.
+converts a complex-valued amplitude field to intensity via `abs2.` and summing over the 4th dimension and dropping the 4th dimension.
+If `pp.transition_dipole` is provided, the dipole transition probability is calculated, otherwise a directionally independed effect is assumed.
+
+#Arguments
++ field:    The 4D field to extract the intensity from
++ pp:       Is checked for whether `pp.transition_dipole` is not nothing. 
 """
 function amp_to_int(field, pp)
     if isnothing(pp.transition_dipole)
