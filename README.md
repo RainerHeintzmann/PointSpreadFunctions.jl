@@ -1,5 +1,5 @@
 # PSFs.jl
-Toolbox for calculating optical PSFs. It incorporates aberrations (specified though Zernike coefficients) and supports a number of
+Toolbox for calculating optical Point Spread Functions (PSFs). It incorporates aberrations (specified though Zernike coefficients) and supports a number of
 models for calculation (`PSFs.MethodSincR`, `PSFs.MethodPropagate`, `PSFs.MethodPropagateIterative`), some are faster and some more accurate.
 
 For detailed documentation, see the docs/dev (or docs/stable) link below.
