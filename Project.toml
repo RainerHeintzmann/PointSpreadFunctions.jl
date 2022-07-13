@@ -1,4 +1,4 @@
-name = "PSFs"
+name = "PointSpreadFunctions"
 uuid = "e8810a93-244e-46c5-8da3-35c5dd956001"
 authors = ["rheintzmann <heintzmann@gmail.com>"]
 version = "0.1.0"

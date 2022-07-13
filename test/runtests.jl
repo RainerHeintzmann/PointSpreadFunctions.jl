@@ -1,6 +1,6 @@
 using Test
 
-using PSFs
+using PointSpreadFunctions
 using NDTools
 
 sz = (128,128,128)
@@ -12,13 +12,13 @@ function ctr_test(dat1, dat2, rtol=0.01)
 end
 
 function compare_asfs(sz, pp, sampling)
-    @time a_prop = apsf(PSFs.MethodPropagate, sz, pp, sampling=sampling);
-    @time a_sincR = apsf(PSFs.MethodSincR, sz ,pp, sampling=sampling);
-    @time a_shell = apsf(PSFs.MethodShell, sz, pp, sampling=sampling);  # fast
-    @time a_iter = apsf(PSFs.MethodPropagateIterative, sz ,pp, sampling=sampling);
-    @time a_RW = apsf(PSFs.MethodRichardsWolf, sz, pp, sampling=sampling);
+    @time a_prop = apsf(PointSpreadFunctions.MethodPropagate, sz, pp, sampling=sampling);
+    @time a_sincR = apsf(PointSpreadFunctions.MethodSincR, sz ,pp, sampling=sampling);
+    @time a_shell = apsf(PointSpreadFunctions.MethodShell, sz, pp, sampling=sampling);  # fast
+    @time a_iter = apsf(PointSpreadFunctions.MethodPropagateIterative, sz ,pp, sampling=sampling);
+    @time a_RW = apsf(PointSpreadFunctions.MethodRichardsWolf, sz, pp, sampling=sampling);
     sz_big = (512,512,128)
-    @time a_prop2 = NDTools.select_region(apsf(PSFs.MethodPropagate, sz_big,pp, sampling=sampling), new_size=sz);
+    @time a_prop2 = NDTools.select_region(apsf(PointSpreadFunctions.MethodPropagate, sz_big,pp, sampling=sampling), new_size=sz);
     @test ctr_test(a_prop, a_iter, 0.05)
     @test ctr_test(a_iter, a_sincR, 0.15)
     @test ctr_test(a_iter, a_shell, 0.1)

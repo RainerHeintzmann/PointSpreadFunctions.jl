@@ -1,14 +1,14 @@
 # PointSpreadFunctions.jl
-Toolbox for calculating optical PSFs. It incorporates aberrations (specified though Zernike coefficients) and supports a number of
+Toolbox for calculating optical PointSpreadFunctions (PSFs). It incorporates aberrations (specified though Zernike coefficients) and supports a number of
 models for calculation (`PointSpreadFunctions.MethodSincR`, `PointSpreadFunctions.MethodPropagate`, `PointSpreadFunctions.MethodPropagateIterative`), some are faster and some more accurate.
 
 For detailed documentation, see the docs/dev (or docs/stable) link below.
 You may also find the file `PSFs_demo.ipnb` in the examples folder helpful.
 
 ## Installation
-To get the latest stable release of PSFs.jl type `]` in the Julia REPL:
+To get the latest stable release of PointSpreadFunctions.jl type `]` in the Julia REPL:
 ```
-] add https://github.com/RainerHeintzmann/PSFs.jl
+] add PointSpreadFunctions.jl
 ```
 
 

@@ -113,10 +113,10 @@ See also:
 
 Example:
 ```jdoctest
-julia> using FFTW, PSFs
+julia> using FFTW, PointSpreadFunctions
 
-julia> ppm = PSFParams(0.580, 1.4, 1.518;pol=pol_scalar,method=PSFs.MethodRichardsWolf, aberrations= aberr, FFTPlan=FFTW.MEASURE)
-PSFParams(0.58, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodSincR, 0x00000000, nothing, nothing)
+julia> ppm = PSFParams(0.580, 1.4, 1.518;pol=pol_scalar,method=PointSpreadFunctions.MethodRichardsWolf, aberrations= aberr, FFTPlan=FFTW.MEASURE)
+PSFParams(0.58, 1.4, 1.518, Float32, ModeWidefield, PointSpreadFunctions.pol_scalar, PointSpreadFunctions.var"#42#43"(), PointSpreadFunctions.MethodSincR, 0x00000000, nothing, nothing)
 
 ```
 """
@@ -128,7 +128,7 @@ struct PSFParams
     mode # microscopy mode (widefield, confocal, etc.) to calculate PSF for ::PSFMode
     polarization # a function calculating the polarization from a given Tuple of relative-k pupil vectors. Can also be pol_scalar()
     aplanatic # aplanatic factor. Provided as a function of angle θ
-    method # the method of calculation (e.g. PSFs.MethodPropagate).
+    method # the method of calculation (e.g. PointSpreadFunctions.MethodPropagate).
     FFTPlan # if not nothing this will be the plan of how to perform FFTs
     aberrations 
     pixelshape # here functions can be supplied, which account for the pixelshape influence (itegration over pixel size).
@@ -163,10 +163,10 @@ Arguments:
 + transition_dipole  If supplied a transition-dipole (e.g. sqrt(2) .* (0.0,1.0,1.0)) will be accounted for in the PSF calculation. If not normalized, the strength will be included.
 Example:
 ```jdoctest
-julia> using FFTW, PSFs
+julia> using FFTW, PointSpreadFunctions
 
-julia> ppm = PSFParams(0.58, 1.4, 1.518;pol=pol_circ,method=PSFs.MethodSincR, aberrations= Aberrations(), FFTPlan=FFTW.MEASURE)
-PSFParams(0.58, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodSincR, 0x00000000, nothing, nothing)
+julia> ppm = PSFParams(0.58, 1.4, 1.518;pol=pol_circ,method=PointSpreadFunctions.MethodSincR, aberrations= Aberrations(), FFTPlan=FFTW.MEASURE)
+PSFParams(0.58, 1.4, 1.518, Float32, ModeWidefield, PointSpreadFunctions.pol_scalar, PointSpreadFunctions.var"#42#43"(), PointSpreadFunctions.MethodSincR, 0x00000000, nothing, nothing)
 
 julia> ppem = PSFParams(ppm; λ=0.620)
 

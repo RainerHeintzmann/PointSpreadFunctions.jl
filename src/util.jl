@@ -37,12 +37,12 @@ See also:
 
 Example:
 ```jdoctest
-julia> using PSFs
+julia> using PointSpreadFunctions
 
 julia> pp = PSFParams(580.0, 1.4, 1.518)
-PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodPropagateIterative, nothing, Aberrations(Any[], Any[], :OSA), nothing)
+PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PointSpreadFunctions.pol_scalar, PointSpreadFunctions.var"#42#43"(), PointSpreadFunctions.MethodPropagateIterative, nothing, Aberrations(Any[], Any[], :OSA), nothing)
 
-julia> PSFs.get_Abbe_limit(pp)
+julia> PointSpreadFunctions.get_Abbe_limit(pp)
 (191.04085f0, 191.04085f0, 622.8464f0)
 ```
 """
@@ -63,12 +63,12 @@ See also:
 
 Example:
 ```jdoctest
-julia> using PSFs
+julia> using PointSpreadFunctions
 
 julia> pp = PSFParams(580.0, 1.4, 1.518)
-PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodPropagateIterative, nothing, Aberrations(Any[], Any[], :OSA), nothing)
+PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PointSpreadFunctions.pol_scalar, PointSpreadFunctions.var"#42#43"(), PointSpreadFunctions.MethodPropagateIterative, nothing, Aberrations(Any[], Any[], :OSA), nothing)
 
-julia> PSFs.get_Nyquist_limit(pp)
+julia> PointSpreadFunctions.get_Nyquist_limit(pp)
 (95.520424f0, 95.520424f0, 311.4232f0)
 ```
 """
@@ -87,15 +87,15 @@ See also:
 
 Example:
 ```jdoctest
-julia> using PSFs
+julia> using PointSpreadFunctions
 
 julia> pp = PSFParams(580.0, 1.4, 1.518)
-PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodPropagateIterative, nothing, Aberrations(Any[], Any[], :OSA), nothing)
+PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PointSpreadFunctions.pol_scalar, PointSpreadFunctions.var"#42#43"(), PointSpreadFunctions.MethodPropagateIterative, nothing, Aberrations(Any[], Any[], :OSA), nothing)
 
 julia> sz = (256,256,64)
 (256, 256, 64)
 
-julia> PSFs.get_required_amp_sampling(sz,pp)
+julia> PointSpreadFunctions.get_required_amp_sampling(sz,pp)
 (188.05583f0, 188.05583f0, 219.73679f0)
 
 ```
@@ -206,11 +206,11 @@ See also:
 
 # Example
 ```jdoctest
-julia> using PSFs, View5D
+julia> using PointSpreadFunctions, View5D
 
 julia> sz = (100,100);d=20.0; w=jinc_r_2d(sz,d); 
 
-julia> q = jinc_r_2d(sz, d; r_func=PSFs.rr_rfft); # a version in RFFT space
+julia> q = jinc_r_2d(sz, d; r_func=PointSpreadFunctions.rr_rfft); # a version in RFFT space
 
 julia> @vt rr(sz) .< d/2.0 real.(ift(w)) fftshift(irfft(q,sz[1]))
 ```
@@ -233,11 +233,11 @@ See also:
 
 # Example
 ```jdoctest
-julia> using PSFs, View5D
+julia> using PointSpreadFunctions, View5D
 
 julia> sz = (100,100);d=20.0; w=jinc_r_2d(sz,d); 
 
-julia> q = sinc_r_2d(sz, d; r_func=PSFs.rr_rfft); # a version in RFFT space
+julia> q = sinc_r_2d(sz, d; r_func=PointSpreadFunctions.rr_rfft); # a version in RFFT space
 
 julia> @vt rr(sz) .< d/2.0 real.(ift(w)) fftshift(irfft(q,sz[1]))
 ```

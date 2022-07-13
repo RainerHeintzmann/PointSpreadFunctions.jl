@@ -145,13 +145,13 @@ Arguments:
 
 Example:
 ```jdoctest
-julia> using PSFs, FFTW
+julia> using PointSpreadFunctions, FFTW
 
-julia> aberr = PSFs.Aberrations([Zernike_Spherical, Zernike_ObliqueAstigmatism],[0.1, 0.2])
+julia> aberr = PointSpreadFunctions.Aberrations([Zernike_Spherical, Zernike_ObliqueAstigmatism],[0.1, 0.2])
 Aberrations([12, 3], [0.1, 0.2], :OSA)
 
 julia> pp = PSFParams(580.0, 1.4, 1.518; aberrations=aberr)
-PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodPropagateIterative, nothing, Aberrations([12, 3], [0.1, 0.2], :OSA), nothing)
+PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PointSpreadFunctions.pol_scalar, PointSpreadFunctions.var"#42#43"(), PointSpreadFunctions.MethodPropagateIterative, nothing, Aberrations([12, 3], [0.1, 0.2], :OSA), nothing)
 
 julia> sz = (10,10,64)
 (10, 10, 64)
@@ -159,7 +159,7 @@ julia> sz = (10,10,64)
 julia> sampling=(190,190,100)
 (190, 190, 100)
 
-julia> PSFs.get_zernike_pupil_phase(sz,pp,sampling)
+julia> PointSpreadFunctions.get_zernike_pupil_phase(sz,pp,sampling)
 10×10 Matrix{Float64}:
  0.0   0.0         0.0         0.0         0.0         0.0         0.0         0.0         0.0         0.0
  0.0   0.0         0.0         0.533599    0.202003   -0.0206203  -0.170662   -0.21173     0.0         0.0
@@ -199,13 +199,13 @@ Arguments:
 
 Example:
 ```jdoctest
-julia> using PSFs, FFTW
+julia> using PointSpreadFunctions, FFTW
 
-julia> aberr = PSFs.Aberrations([Zernike_Spherical, Zernike_ObliqueAstigmatism],[0.1, 0.2])
+julia> aberr = PointSpreadFunctions.Aberrations([Zernike_Spherical, Zernike_ObliqueAstigmatism],[0.1, 0.2])
 Aberrations([12, 3], [0.1, 0.2], :OSA)
 
 julia> pp = PSFParams(580.0, 1.4, 1.518; aberrations=aberr)
-PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PSFs.pol_scalar, PSFs.var"#42#43"(), PSFs.MethodPropagateIterative, nothing, Aberrations([12, 3], [0.1, 0.2], :OSA), nothing)
+PSFParams(580.0, 1.4, 1.518, Float32, ModeWidefield, PointSpreadFunctions.pol_scalar, PointSpreadFunctions.var"#42#43"(), PointSpreadFunctions.MethodPropagateIterative, nothing, Aberrations([12, 3], [0.1, 0.2], :OSA), nothing)
 
 julia> sz = (10,10,64)
 (10, 10, 64)
@@ -213,7 +213,7 @@ julia> sz = (10,10,64)
 julia> sampling=(190,190,100)
 (190, 190, 100)
 
-julia> PSFs.get_zernike_pupil(sz,pp,sampling)
+julia> PointSpreadFunctions.get_zernike_pupil(sz,pp,sampling)
 10×10 Matrix{ComplexF64}:
  1.0+0.0im        1.0+0.0im               1.0+0.0im             1.0+0.0im               1.0+0.0im       …          1.0+0.0im             1.0+0.0im               1.0+0.0im             1.0+0.0im
  1.0+0.0im        1.0+0.0im               1.0+0.0im       -0.977799-0.209546im     0.297025+0.95487im         0.478105-0.878303im   0.238146-0.971229im          1.0+0.0im             1.0+0.0im
