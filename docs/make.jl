@@ -1,8 +1,8 @@
 using Base: package_slug
-using Documenter, PSFs
+using Documenter, PointSpreadFunctions
 
-makedocs(modules=[PSFs], sitename="PSFs Documentation", doctest = false,
-        pages = Any["PSFs.jl" => "index.md",
+makedocs(modules=[PointSpreadFunctions], sitename="PSFs Documentation", doctest = false,
+        pages = Any["PointSpreadFunctions.jl" => "index.md",
         "Workflow" => Any[
                         "workflow/PSF_parameters.md",
                         "workflow/PSF_generation.md",
@@ -13,4 +13,4 @@ makedocs(modules=[PSFs], sitename="PSFs Documentation", doctest = false,
                     ]
         )
 
-deploydocs(repo = "github.com/RainerHeintzmann/PSFs.jl.git", devbranch = "main")
+deploydocs(repo = "github.com/RainerHeintzmann/PointSpreadFunctions.jl.git", devbranch = "main")
