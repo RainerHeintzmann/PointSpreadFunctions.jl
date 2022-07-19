@@ -393,8 +393,8 @@ function psf(::Type{ModeSTED}, sz::NTuple, pp::PSFParams; sampling=nothing, pp_s
 end
 
 """
-    psf(::Type{Mode4Pi}, sz::NTuple, pp_ex::PSFParams; sampling=nothing, pp_ex2=pp_ex, pp_em=nothing, pp_em2=nothing, rel_ex_phase = 0.0, rel_em_phase = 0.0, pinhole=nothing, pinhole_ft=disc_pinhole_ft, pinhole_positions=[(0.0,0.0)], ex_modifier=modify_ident)
-    Calculates a 4Pi point spread function. 
+    psf(::Type{Mode4Pi}, sz::NTuple, pp_ex::PSFParams; sampling=nothing, pp_ex2=pp_ex, pp_em=nothing, pp_em2=nothing, rel_ex_phase = 0.0, rel_em_phase = 0.0, pinhole=nothing, pinhole_ft=disc_pinhole_ft, pinhole_positions=[(0.0,0.0)], ex_modifier=modify_square)
+    Calculates a 4Pi point spread function. Note that the default is using a two-photon excitation.
     Returns the PSF or a vector of PSFs.
     
 #Parameters
