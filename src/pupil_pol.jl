@@ -1,4 +1,4 @@
-export pol_scalar, pol_scalar_spiral, pol_x, pol_y, pol_circ, pol_circ_spiral
+export pol_scalar, pol_scalar_spiral, pol_x, pol_y, pol_circ, pol_circ_spiral, pol_circ_tophat
 # define a bunch of standard pupil polarizations
 
 """
@@ -60,7 +60,18 @@ assumes circular polarization in illumination or an x-oriented polarizer in dete
 This version includes phase spiral defining the local (xypos-dependent) phase of both x and y polarization.
 """
 function pol_circ_spiral(T, xypos) # e.g. for STED microscopy
-    pol_circ(T, xypos) .* cis.(atan(T.(xypos...)))
+    pol_circ(T, xypos) .* cis.(atan(T(xypos[2]),T(xypos[1])))
 end
+
+"""
+    pol_circ_tophat(T, xypos, pupil_r)
+
+assumes circular polarization in illumination or an x-oriented polarizer in detection. 
+This version includes phase 0/π tophat defining the local (xypos-dependent) phase of both x and y polarization.
+"""
+function pol_circ_tophat(T, xypos) # e.g. for STED microscopy
+    pol_circ(T, xypos) .* cispi.((abs2(xypos[1]) + abs2(xypos[2]) > 1/2))
+end
+
 
 
