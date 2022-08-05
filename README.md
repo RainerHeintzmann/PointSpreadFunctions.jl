@@ -18,6 +18,12 @@ To get the latest stable release of PointSpreadFunctions.jl type `]` in the Juli
 
 
 
+## JuliaCon 2022
+<a  href="https://www.youtube.com/watch?v=HwhrCIGzYAk"><img src="docs/src/assets/juliacon.png"  width="300"></a>
+
+
+
+
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-orange.svg 
 [docs-dev-url]: https://RainerHeintzmann.github.io/PointSpreadFunctions.jl/dev/ 
 
