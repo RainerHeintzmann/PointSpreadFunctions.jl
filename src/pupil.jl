@@ -179,9 +179,15 @@ function get_zernike_pupil_phase(sz, pp, sampling)
     coefficients = pp.aberrations.coefficients
     index = pp.aberrations.index_style
     border = k_pupil_pos(sz[1:2],pp,sampling[1:2])
-    X = ramp(1,sz[1],scale = 1/border[1])
-    Y = ramp(1,sz[2],scale = 1/border[2])
-    D = [[Zernike(j; index=index, coord=:cartesian)(x,y) for x in X, y in Y] for j in J ]
+    rho = rr(pp.dtype, sz, scale = one(pp.dtype)./border)
+    rho = min.(rho, one(pp.dtype))
+    phi = phiphi(pp.dtype, sz, scale = one(pp.dtype)./border)
+    # X = ramp(pp.dtype, 1,sz[1],scale = 1/border[1])
+    # X = min.(X, one(pp.dtype))
+    # Y = ramp(pp.dtype, 1,sz[2],scale = 1/border[2])
+    # Y = min.(Y, one(pp.dtype))
+    # D = [[Zernike(j; index=index, coord=:cartesian)(x,y) for x in X, y in Y] for j in J ]
+    D = [[Zernike(j; index=index, coord=:polar)(r,p) for (r,p) in zip(rho, phi)] for j in J ]
     return reduce(+,map(*,D,coefficients))
 end
 
