@@ -14,9 +14,9 @@ ZernikePolynomials = "e462d300-c971-11e9-30f1-fb93b1f8f73a"
 
 [compat]
 FFTW = "1.4"
-FourierTools = "0.3.2"
+FourierTools = "0.3.2, 0.4.2"
 IndexFunArrays = "0.2.4"
-NDTools = "0.4.4"
+NDTools = "0.4.4, 0.5.0"
 QuadGK = "2"
 SpecialFunctions = "1.5"
 ZernikePolynomials = "0.1"

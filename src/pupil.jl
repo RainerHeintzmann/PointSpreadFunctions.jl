@@ -34,12 +34,12 @@ end
 
 returns the aplanatic factor as specified in `pp.aplanatic` as a pupil array.
 """
-function aplanatic_factor(sz, pp::PSFParams, sampling; is_proj=false)
+function aplanatic_factor(sz, pp::PSFParams, sampling; is_proj=true)
     α_max = asin(pp.dtype(pp.NA/pp.n))
     if is_proj
-        pp.aplanatic.(limit_θ.(pupil_θ(sz, pp, sampling),α_max)) ./ cos.(limit_θ.(pupil_θ(sz, pp, sampling), α_max))
-    else
         pp.aplanatic.(limit_θ.(pupil_θ(sz, pp, sampling),α_max))
+    else
+        pp.aplanatic.(limit_θ.(pupil_θ(sz, pp, sampling),α_max)) .* cos.(limit_θ.(pupil_θ(sz, pp, sampling), α_max))
     end
 end
 
@@ -87,6 +87,11 @@ end
     pupil_xyz(sz, pp, sampling=nothing)
 
 creates a pupil with electric field distributions in XYZ. Returns a 4D dataset with the electric field components along the 4th dimension.
+#Arguments
++ 'sz':     size of the pupil in pixels
++ 'pp':     the `PSFParam` structure with all the PSF parameters
++ 'sampling':   the pixel sampling in the same units as the wavelength
++ 'is_proj':    defines whether the pupil is to be interpreted as the projection of the McCutchen pupil or not. This yields a by 1 ./cos(Theta) modified aplanatic factor.
 """
 function pupil_xyz(sz, pp, sampling=nothing; is_proj=true)
     if isnothing(sampling)
@@ -129,6 +134,19 @@ function get_propagator_gradient(prop_phase, scalar, xy_scale)
     dx_prop_phase = ifelse.(prop_phase .== zero(dtype), zero(dtype), scalar.^2 ./ prop_phase .* xx(dtype, sz, scale = xy_scale.^2))
     dy_prop_phase = ifelse.(prop_phase .== zero(dtype), zero(dtype), scalar.^2 ./ prop_phase .* yy(dtype, sz, scale = xy_scale.^2))
     return dx_prop_phase, dy_prop_phase
+end
+
+function get_Zernike_normcoeff(index, j)
+    n,m = let 
+        if index == :OSA
+            OSA2mn(j)
+        elseif index == :Noll
+            Noll2mn(j)
+        else
+            error("Unknown Zernike sequential index")
+        end
+    end
+    return normalization(n,m) # The normalization of the Zernike toolbox is according to Thibos et al. - "Standards for Reporting the Optical Aberrations of Eyes"
 end
 
 """
@@ -176,6 +194,9 @@ julia> PointSpreadFunctions.get_zernike_pupil_phase(sz,pp,sampling)
 """
 function get_zernike_pupil_phase(sz, pp, sampling) 
     J = pp.aberrations.indices
+    if isempty(J)
+        return zeros(pp.dtype, sz)
+    end
     coefficients = pp.aberrations.coefficients
     index = pp.aberrations.index_style
     border = k_pupil_pos(sz[1:2],pp,sampling[1:2])
@@ -187,8 +208,11 @@ function get_zernike_pupil_phase(sz, pp, sampling)
     # Y = ramp(pp.dtype, 1,sz[2],scale = 1/border[2])
     # Y = min.(Y, one(pp.dtype))
     # D = [[Zernike(j; index=index, coord=:cartesian)(x,y) for x in X, y in Y] for j in J ]
+    # lets change this to 1-based normalization as in Wikipedia
     D = [[Zernike(j; index=index, coord=:polar)(r,p) for (r,p) in zip(rho, phi)] for j in J ]
-    return reduce(+,map(*,D,coefficients))
+    # use the coefficients as defined on Wikipedia rather than the Zernike definition of the toolbox
+    mod_coeff = [coef ./ get_Zernike_normcoeff(index, j) for (j,coef) in zip(J, coefficients)] 
+    return reduce(+,map(*,D, mod_coeff))
 end
 
 """
@@ -235,5 +259,6 @@ julia> PointSpreadFunctions.get_zernike_pupil(sz,pp,sampling)
 ```
 """
 function get_zernike_pupil(sz, pp, sampling) 
-    cispi.(2 .*get_zernike_pupil_phase(sz, pp, sampling))
+    #cispi.(2 .*get_zernike_pupil_phase(sz, pp, sampling))
+    cis.(get_zernike_pupil_phase(sz, pp, sampling))
 end

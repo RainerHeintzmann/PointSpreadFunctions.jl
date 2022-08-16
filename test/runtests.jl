@@ -111,7 +111,7 @@ end
     pp_em = PSFParams(0.5,1.3,1.52; mode=Mode4Pi, pol=pol_x);
     pp_ex = PSFParams(0.800,1.3,1.52; aplanatic=aplanatic_illumination, mode=Mode4Pi, pol=pol_x);
     @time p_4pi = psf(sz,pp_ex; pp_em=pp_em, sampling=sampling, pinhole=2.0, ex_modifier=PointSpreadFunctions.modify_ident);
-    @test isapprox(sum(p_4pi[:,:,64]), 2.0, rtol=0.01)
+    @test isapprox(sum(p_4pi[:,:,64]), 2.376, rtol=0.01)
 end
 
 return

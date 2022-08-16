@@ -152,8 +152,8 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
         _, rel_kz = get_McCutchen_kz_center(psz[1:3],pp,sampling)
         prop_pupil .*= cispi(-2*rel_kz/psz[3])
     end
-    border_in = 1.0 .- PMLsz[1:2] ./ psz[1:2]
-    real_window = collect(exp.(1.75 .* (window_linear(size(start_pupil)[1:2],border_in=border_in,border_out=1) .-1)))  # This is maybe not the best PML?
+    border_in = pp.dtype.(1.0 .- PMLsz[1:2] ./ psz[1:2])
+    real_window = collect(exp.(pp.dtype(1.75) .* (window_linear(pp.dtype, size(start_pupil)[1:2],border_in=border_in,border_out=1) .-1)))  # This is maybe not the best PML?
     # real_window = window_gaussian(size(start_pupil)[1:2], border_in=border_in,border_out=border_in.*0.5 .+ 0.5)  # This is maybe not the best PML?
     # real_window = window_hanning(size(start_pupil)[1:2],border_in=border_in,border_out=1)
     prop_pupil = conj(prop_pupil) # from now the advancement is in the opposite direction
@@ -164,7 +164,7 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
         Pi2d = plan_ifft(pupil,(1,2), flags=pp.FFTPlan)
     end
     pupil = start_pupil
-    for z in start_z:-1:2 # from the middle to the start
+    for z = start_z:-1:2 # from the middle to the start
         slice = collect(ift2d(pupil)) # should be ifft2d for speed reasons
         # dst = @view slices[:,:,z:z,:]
         # writes the slice into the destination arry in slices
@@ -185,13 +185,14 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, cente
     else
         prop_pupil = conj(prop_pupil) # from now the advancement is in the opposite direction
         pupil = start_pupil .* prop_pupil
-        for z in start_z+1:sz[3]-1  # from the middle forward
+        for z in start_z+1:sz[3]  # from the middle forward
             slice = collect(ift2d(pupil))
             slices[:,:,z:z,:] .= select_region_view(slice,  new_size=sz[1:2])
-            pupil = ft2d(slice .* real_window)
-            pupil .*= prop_pupil 
+            if z < sz[3]
+                pupil = ft2d(slice .* real_window)
+                pupil .*= prop_pupil 
+            end
         end
-        slices[:,:,sz[3]:sz[3],:] .= select_region_view(collect(ift2d(pupil)),  new_size=sz[1:2])
     end        
     return slices
 end
@@ -306,9 +307,11 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
 
     aplanatic_fct = let
         if pp.polarization == pol_scalar
-            (θ) -> pp.aplanatic(θ) ./ sqrt.(max.(cos.(θ),zero(typeof(θ))))
-        else
             pp.aplanatic
+            (θ) -> pp.aplanatic(θ) .* sqrt.(max.(cos.(θ),zero(typeof(θ))))
+        else
+            # pp.aplanatic
+            (θ) -> pp.aplanatic(θ) .* max.(cos.(θ),zero(typeof(θ)))
         end
     end
 
