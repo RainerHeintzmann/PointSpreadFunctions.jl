@@ -12,7 +12,7 @@ function amp_to_int(field, pp)
     if isnothing(pp.transition_dipole)
         dropdims(sum(abs2.(field), dims=4), dims=4)
     else
-        transition_dipole = reorient([pp.transition_dipole...], Val(4))
+        transition_dipole = reorient([pp.transition_dipole...], 4, Val(4))
         dropdims(sum(abs2.(field .* transition_dipole), dims=4), dims=4)
     end
 end

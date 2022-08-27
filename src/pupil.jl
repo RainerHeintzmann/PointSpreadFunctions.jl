@@ -110,15 +110,15 @@ end
 
 retrieves the propagator phase, prpagating a single Z-slice.
 """
-function get_propagator(sz,pp,sampling)
+function get_propagator(sz, pp, sampling)
     if isnothing(sampling)
         sampling = get_Ewald_sampling(sz, pp)
     end
     k_max_rel = sampling[1:2] ./ (pp.λ / pp.n)
     # prop1 = propagator(pp.dtype, sz[1:2], Δz=1, k_max = k_max_rel)
     # prop = cispi.(2 .* phase_kz(pp.dtype, sz[1:2], scale = 1 ./ (k_max_rel .* sz[1:2])))
-    scalar = (2π*sampling[3] / (pp.λ / pp.n))
-    xy_scale = 1 ./ (k_max_rel .* sz[1:2])
+    scalar = pp.dtype((2π*sampling[3] / (pp.λ / pp.n)))
+    xy_scale = pp.dtype.(1 ./ (k_max_rel .* sz[1:2]))
     return scalar .* phase_kz(pp.dtype, sz[1:2], scale = xy_scale), scalar, xy_scale
 end
 

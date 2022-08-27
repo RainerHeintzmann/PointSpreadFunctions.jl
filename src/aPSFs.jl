@@ -134,7 +134,7 @@ end
 
 # This function is needed for the propagate method, but iterates between real and Fourier space always smoothly deleting "out-of-bound" waves.
 # The final result is already in real space.
-function apply_propagator_iteratively(sz, pp::PSFParams; sampling=nothing, center_kz=false) 
+function apply_propagator_iteratively(sz, pp::PSFParams; sampling, center_kz=false) 
     z_planes = sz[3]
     # calculate the phase derivatives
     start_z = z_planes÷2+1
