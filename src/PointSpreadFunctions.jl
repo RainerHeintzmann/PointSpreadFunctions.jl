@@ -19,11 +19,12 @@ include("aPSFs.jl")
 """
     psf(::Type{ModeWidefield}, sz::NTuple, pp::PSFParams; sampling=get_sampling(sz, pp))
 
-calculates the widefield single-frequency point spread function (psf), i.e. the image of a single (very small) emitter. Most of the parameters
-(such as refractive index, numerical aperture, vacuum wavelength, aberrations etc.) are hidden in the parameter structure argument `pp`,
+Calculates the widefield single-frequency point spread function (psf), i.e. the image of a single (very small) emitter. 
+Most of the parameters (such as refractive index, numerical aperture, vacuum wavelength, aberrations etc.) are hidden in the 
+parameter structure argument `pp`,
 which should be generated via the `PSFParams()` constructor. See ``PSFParams()` for details.
 
-#Parameters
+# Parameters
 + `sz`:         size tuple of the final PSF
 + `pp`:         PSF parameters of the PSF. See `PSFParams()` for details. The argument `pp.aplanatic` defined whether an excitation or emission PSF is calculated.
 + `sampling=nothing`:   The sampling parameters of the resulting PSF. If `nothing` is provided, the PSF will be sampled according to the Abbe limit.
@@ -31,17 +32,19 @@ which should be generated via the `PSFParams()` constructor. See ``PSFParams()` 
 + `return_amp=false`:    Has to be `false` since confocal amplitude spread functions do not exist for non-zero pinhole sizes. 
 
 See also:
-+ apsf():  calculates the underlying amplitude point spread function (apsf)
++ `apsf`:  calculates the underlying amplitude point spread function (apsf)
 
 Example:
-```jdoctest
+```julia-repl
 julia> pp = PSFParams(0.5,1.4,1.52); sz=(128,128,128); sampling=(0.050,0.050,0.200);
 # an emission PSF of an isotropic (freely rotating emitter)
+
 julia> p_wf = psf(sz, pp; sampling=sampling);
 # an emission PSF of an emitter oriented along the Z direction
-julia> pp_dipole = PSFParams(0.5,1.4,1.52; transition_dipole=[0.0,0.0,1.0]);
-julia> p_dipole = psf(sz, pp_dipole; sampling=sampling);
 
+julia> pp_dipole = PSFParams(0.5,1.4,1.52; transition_dipole=[0.0,0.0,1.0]);
+
+julia> p_dipole = psf(sz, pp_dipole; sampling=sampling);
 ```
 """
 function psf(::Type{ModeWidefield}, sz::NTuple, pp::PSFParams; sampling=nothing, use_resampling=true, return_amp=false) # unclear why the resampling seems to be so bad
@@ -62,10 +65,11 @@ end
 
 """
     psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, pinhole=nothing, pinhole_ft=disc_pinhole_ft, sampling=nothing, use_resampling=true, return_amp=false, pinhole_positions=[(0.0,0.0)]) # unclear why the resampling seems to be so bad
-    Calculates a confocal point spread function. The normalisation is such that a completely open `pinhole` diameter yields the excitation PSF with its normalization. 
-    Returns the PSF or a vector of PSFs.
+
+Calculates a confocal point spread function. The normalisation is such that a completely open `pinhole` diameter yields the excitation PSF with its normalization. 
+Returns the PSF or a vector of PSFs.
     
-#Parameters
+# Parameters
 + `sz`:         size tuple of the final PSF
 + `pp_em`:      PSF parameters of the emission PSF. PSF parameters of the PSF. See `PSFParams()` for details. This should include the emission wavelength
 + `pp_ex=nothing`:      This is a required named parameter, containing all the settings for the excitation PSF. This should include the excitation wavelength as well as typically `aplanatic=aplanatic_illumination`.
@@ -77,7 +81,7 @@ end
 + `pinhole_ft=disc_pinhole_ft`:  Specifies which function is used to calculate the Fourier transform of the pinhole. This allows the user to control the pinhole shape. 
 + `ex_modifier`:   A function that can modify the excitation PSF. By default the identity is used, but other options are `modify_square` to calculate a two-photon confocal PSF. However, you should typically use the `Mode2Photon` to do this. Note that the order of the PSFParams are reversed.
 
-```jdoctest
+```julia-repl
 julia> pp_em = PSFParams(0.5,1.4,1.52; mode=ModeConfocal);
 julia> pp_ex = PSFParams(pp_em; λ=0.488, aplanatic=aplanatic_illumination);
 julia> p_conf = psf((128,128,128),pp_em; pp_ex=pp_ex, pinhole=0.1, sampling=(0.040,0.040,0.100));
@@ -150,9 +154,9 @@ end
     modify_STED_exp(h, h_doughnut)
 
 A function from a series of modficator functions which serve to modify the excitation intensity.
-    This version applies a second STED PSF `h_doughnut` to deplete the excitation PSF `h`.
-    The depletion is modeled by an exponential decay as obtained by a relatively short STED pulse following a very short excitation pulse.
-    Note the `h_doughnut` should be the depletion PSF. Note that this function should be used as a tool to define a new function with fixed second argument.
+This version applies a second STED PSF `h_doughnut` to deplete the excitation PSF `h`.
+The depletion is modeled by an exponential decay as obtained by a relatively short STED pulse following a very short excitation pulse.
+Note the `h_doughnut` should be the depletion PSF. Note that this function should be used as a tool to define a new function with fixed second argument.
 """
 function modify_STED_exp(h, h_doughnut)
     h .* exp.(.- h_doughnut)
@@ -237,6 +241,7 @@ end
     disc_pinhole_ft(sz, pp, pinhole)
 
 calculates the Fourier transform of a disc-shaped pinhole
+
 + `pp`: PSF parameter structure
 + `sampling`: sampling of the image pixels in object coordinates
 + `pinhole`: diameter of the pinhole in pixels
@@ -249,6 +254,7 @@ end
     disc_pinhole_ft(sz, pp, pinhole)
 
 calculates the Fourier transform of a box-shaped pinhole
+
 + `pp`: PSF parameter structure
 + `sampling`: sampling of the image pixels in object coordinates
 + `pinhole`: tuple of side lengths of the pinhole in pixels
@@ -282,10 +288,11 @@ end
 
 """
     psf(::Type{ModeISM}, sz::NTuple, pp_em::PSFParams; pinhole=nothing, sampling=nothing, pinhole_ft=box_pinhole_ft, pinhole_positions=[(0.0,0.0)], pinhole_dist=0.5, pinhole_grid=(5,5), ism_pos=ism_positions_rect, args...)
-    Calculates a confocal point spread function. The normalisation is such that a completely open `pinhole` diameter yields the excitation PSF with its normalization. 
-    Returns the PSF or a vector of PSFs.
+
+Calculates a confocal point spread function. The normalisation is such that a completely open `pinhole` diameter yields the excitation PSF with its normalization. 
+Returns the PSF or a vector of PSFs.
     
-#Parameters
+# Parameters
 + `sz`:         size tuple of the final PSF
 + `pp_em`:      PSF parameters of the emission PSF. This should include the emission wavelength
 + `pp_ex=nothing`:      This is a required named parameter, containing all the settings for the excitation PSF. This should include the excitation wavelength as well as typically `aplanatic=aplanatic_illumination`.
@@ -298,7 +305,7 @@ end
 + `pinhole_ft=box_pinhole_ft`:  Specifies which function is used to calculate the Fourier transform of the pinhole. This allows the user to control the pinhole shape. E.g. hexagonal pattern with round pinholes
 + `pinhole_positions=nothing`:  Specifies the precise positions of the pinholes in the detection pathway. Be careful, since this is not the same as the position of the relative shift of the images.
 
-```jdoctest
+```julia-repl
 julia> sz=(128,128,128); sampling = (0.04,0.04,0.120)
 julia> pp_em = PSFParams(0.5,1.4,1.52; mode=ModeISM);
 julia> pp_ex = PSFParams(pp_em; λ=0.488, aplanatic=aplanatic_illumination);
@@ -325,10 +332,11 @@ end
 
 """
     psf(::Type{Mode2Photon}, sz::NTuple, pp_ex::PSFParams; pp_em=nothing, pinhole=nothing, sampling=nothing, pinhole_ft=disc_pinhole_ft, args...)
-    Calculates a 2-photon (potentially confocal) point spread function.  
-    Returns the PSF or a vector of PSFs.
+
+Calculates a 2-photon (potentially confocal) point spread function.  
+Returns the PSF or a vector of PSFs.
     
-#Parameters
+# Parameters
 + `sz`:         size tuple of the final PSF
 + `pp_ex`:      PSF parameters of the excitation PSF. This should include the exission wavelength (typically in the IR region). Please make sure to also set `pp.aplanatic=aplanatic_illumination`.
 + `pp_em`:      PSF parameters of the emission PSF. This only needs to be supplied, if a pinhole is used. Otherwise non-descanned detection (NDD) is assumed.
@@ -338,7 +346,7 @@ end
 + `return_amp=false`:    Has to be `false` since confocal amplitude spread functions do not exist for non-zero pinhole sizes. 
 + `pinhole_positions=[(0.0,0.0)]`:  A list of pinhole positions. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs.
 
-```jdoctest
+```julia-repl
 julia> sz=(128,128,128); sampling = (0.04,0.04,0.120)
 julia> pp_ex = PSFParams(0.8,1.4,1.52; mode=Mode2Photon, aplanatic= aplanatic_illumination);
 julia> p_2p = psf(sz,pp_ex; sampling=sampling);
@@ -354,10 +362,12 @@ end
 
 """
     psf(::Type{ModeSTED}, sz::NTuple, pp_ex::PSFParams, pp_sted::PSFParams; pp_em=nothing, pinhole=nothing, sampling=nothing, pinhole_ft=disc_pinhole_ft, args...)
-    Calculates a 2-photon (potentially confocal) point spread function.  
-    Returns the PSF or a vector of PSFs.
+
+
+Calculates a 2-photon (potentially confocal) point spread function.  
+Returns the PSF or a vector of PSFs.
     
-#Parameters
+# Parameters
 + `sz`:         size tuple of the final PSF
 + `pp_ex`:      PSF parameters of the excitation PSF. This should include the exission wavelength (typically in the IR region). Please make sure to also set `pp.aplanatic=aplanatic_illumination`.
 + `pp_sted`:      PSF parameters of the excitation PSF. This should include the exission wavelength (typically in the IR region). Please make sure to also set `pp.aplanatic=aplanatic_illumination`.
@@ -368,7 +378,7 @@ end
 + `return_amp=false`:    Has to be `false` since confocal amplitude spread functions do not exist for non-zero pinhole sizes. 
 + `pinhole_positions=[(0.0,0.0)]`:  A list of pinhole positions. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs.
 
-```jdoctest
+```julia-repl
 julia> sz=(128,128,128); sampling = (0.04,0.04,0.120)
 julia> pp_em = PSFParams(0.510,1.4,1.52; mode=ModeSTED); # STED suppression beam
 julia> pp_ex = PSFParams(0.488,1.4,1.52; aplanatic= aplanatic_illumination);
@@ -394,10 +404,11 @@ end
 
 """
     psf(::Type{Mode4Pi}, sz::NTuple, pp_ex::PSFParams; sampling=nothing, pp_ex2=pp_ex, pp_em=nothing, pp_em2=nothing, rel_ex_phase = 0.0, rel_em_phase = 0.0, pinhole=nothing, pinhole_ft=disc_pinhole_ft, pinhole_positions=[(0.0,0.0)], ex_modifier=modify_square)
-    Calculates a 4Pi point spread function. Note that the default is using a two-photon excitation.
-    Returns the PSF or a vector of PSFs.
+
+Calculates a 4Pi point spread function. Note that the default is using a two-photon excitation.
+Returns the PSF or a vector of PSFs.
     
-#Parameters
+# Parameters
 + `sz`:         size tuple of the final PSF
 + `pp_ex`:      PSF parameters of the excitation PSF. This should include the exission wavelength (typically in the IR region). Please make sure to also set `pp.aplanatic=aplanatic_illumination`.
 + `pp_ex2`:     PSF parameters of the other side excitation PSF. If `nothing` is provided, single-sided excitation (e.g. 4Pi Type B) is assumed.
@@ -408,7 +419,7 @@ end
 + `sampling=nothing`:   The sampling parameters of the resulting PSF.
 + `pinhole_positions=[(0.0,0.0)]`:  A list of pinhole positions. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs.
 
-```jdoctest
+```julia-repl
 julia> sampling = (0.04,0.04,0.04)
 julia> sz = (128,128,128)
 julia> pp_em = PSFParams(0.5,1.3,1.52; mode=Mode4Pi, pol=pol_x);
@@ -480,7 +491,7 @@ end
 """
     psf(sz::NTuple, pp::PSFParams; sampling=get_sampling(sz, pp))
 
-calculates the point spread function (psf), i.e. the image of a single (very small) emitter. Most of the parameters
+Calculates the point spread function (psf), i.e. the image of a single (very small) emitter. Most of the parameters
 (such as refractive index, numerical aperture, vacuum wavelength, aberrations etc.) are hidden in the parameter structure argument `pp`,
 which should be generated via the `PSFParams()` constructor. See ``PSFParams()` for details.
 Note that the field `pp.mode` defines the microscopic mode to simulate. Currently implemented are the default `ModeWidefield` and `ModeConfocal`.
@@ -489,7 +500,7 @@ See also:
 + apsf():  calculates the underlying amplitude point spread function (apsf)
 
 Example:
-```jdoctest
+```julia-repl
 julia> pp = PSFParams(0.5,1.4,1.52);
 julia> p = psf((128,128,128),pp; sampling=(0.050,0.050,0.200));
 ```
