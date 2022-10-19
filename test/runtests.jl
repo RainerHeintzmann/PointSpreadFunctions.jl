@@ -117,7 +117,7 @@ end
 @testset "2D vs. 3D" begin
     sampling = (0.04,0.04)
     sz = (128,128)
-    pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, pol=pol_x);
+    pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodRichardsWolf, pol=pol_x);
     @test psf(sz, pp; sampling=sampling) == psf((sz...,1),pp; sampling=(sampling...,1))[:,:,1]
     pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodPropagateIterative, pol=pol_x);
     @test psf(sz, pp; sampling=sampling) == psf((sz...,1),pp; sampling=(sampling...,eps(eltype(sampling))))[:,:,1]

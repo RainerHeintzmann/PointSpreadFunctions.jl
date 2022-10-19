@@ -433,6 +433,17 @@ function k_xy_rel_pupil(sz,pp,sampling)
 end
 
 """
+    size_sampling_to3d()
+
+converts size and sampling to 3d vectors
+"""
+function size_sampling_to3d(sz, sampling)
+    sz = (length(sz)>2) ? sz : (sz[1:2]..., 1) 
+    sampling = (length(sampling)>2) ? sampling : (sampling[1:2]..., eps(eltype(sampling)))
+    return sz, sampling
+end
+
+"""
     check_amp_sampling_xy(sz, pp,sampling)
 
 issues a warning if the amplitude sampling along X and Y is not within the required limits.

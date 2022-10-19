@@ -113,11 +113,13 @@ end
 
 
 function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
-    sz = (length(sz)>2) ? sz : (sz[1:2]..., 1) # to also work for 2D input sizes
+
     if isnothing(sampling)
         sampling = get_Ewald_sampling(sz, pp)
         print("Sampling is $sampling \n")
     end
+    sz, sampling = size_sampling_to3d(sz, sampling)
+
     check_amp_sampling(sz, pp, sampling)
     # the pupil below is the ft of a jinc in real space and includes a factor of my_disc(sz[1:2],pp) to reduce wrap around
     pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
@@ -209,13 +211,7 @@ function apsf(::Type{MethodPropagateIterative}, sz::NTuple, pp::PSFParams; sampl
         print("Sampling is $sampling \n")
     end
 
-    sz, sampling, is2d = let 
-        if length(sz)>2
-            sz, sampling, false
-        else
-            (sz[1:2]...,1), (sampling[1:2]..., eps(eltype(sampling))), true
-        end
-    end
+    sz, sampling = size_sampling_to3d(sz, sampling)
     check_amp_sampling(sz, pp, sampling)
      # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
     return normalize_amp_to_plane(apply_propagator_iteratively(sz, pp, sampling=sampling, center_kz=center_kz))
@@ -243,6 +239,7 @@ function apsf(::Type{MethodShell}, sz::NTuple, pp::PSFParams; sampling=nothing, 
         sampling = get_Ewald_sampling(sz, pp)
         print("Sampling is $sampling \n")
     end
+    sz, sampling = size_sampling_to3d(sz, sampling)
     check_amp_sampling(sz, pp, sampling)
     pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
 
@@ -282,14 +279,14 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
     if length(pp.aberrations.indices) > 0
         error("The Richards & Wolf amplitude spread function calculations does currently not support aberrations. Please choose a different method.")
     end
+    sz, sampling = size_sampling_to3d(sz, sampling)
 
     sampling_r = min(sampling[1],sampling[2])/2.0
     diagonal = sqrt(sum(abs2.(sz[1:2] .* sampling[1:2]))) / 2.0;
     sr = ceil(Int64, diagonal/sampling_r) + 1
     r = xx((sr,), scale=sampling_r, offset=CtrCorner) # a generator for radius
     k = 2pi / (pp.λ / pp.n);
-    sz3d = (length(sz)>2) ? sz : (sz[1:2]..., 1) # z-size, also working for 2D sizes
-    szz = sz3d[3] 
+    szz = sz[3] 
     kz = yy((1, szz), scale=k*sampling[3])
     function integrate!(I, w, theta)  # w includes the aplanatic factor
         (sint,cost) = sincos(theta);
@@ -342,7 +339,7 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
             3
         end
     end
-    E = zeros(Complex{pp.dtype}, (sz3d..., numEl)) # I0, I1 and I2
+    E = zeros(Complex{pp.dtype}, (sz..., numEl)) # I0, I1 and I2
     _, rel_kz = get_McCutchen_kz_center((sz[1:2]..., szz),pp,sampling)
     for z = 1:szz
         I0 = @view I012[:,z,1] # create views to be able to write by 1D indexing into the appropriate slices.
