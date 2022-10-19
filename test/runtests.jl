@@ -114,4 +114,21 @@ end
     @test isapprox(sum(p_4pi[:,:,64]), 2.376, rtol=0.01)
 end
 
+@testset "2D vs. 3D" begin
+    sampling = (0.04,0.04)
+    sz = (128,128)
+    pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, pol=pol_x);
+    @test psf(sz, pp; sampling=sampling) == psf((sz...,1),pp; sampling=(sampling...,1))[:,:,1]
+    pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodPropagateIterative, pol=pol_x);
+    @test psf(sz, pp; sampling=sampling) == psf((sz...,1),pp; sampling=(sampling...,eps(eltype(sampling))))[:,:,1]
+    pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodShell, pol=pol_x);
+    @test psf(sz, pp; sampling=sampling) == psf((sz...,1),pp; sampling=(sampling...,eps(eltype(sampling))))[:,:,1]
+    pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodPropagate, pol=pol_x);
+    @test psf(sz, pp; sampling=sampling) == psf((sz...,1),pp; sampling=(sampling...,eps(eltype(sampling))))[:,:,1]
+    pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodSincR, pol=pol_x);
+
+    pp = PSFParams(0.5,1.3,1.52; mode=ModeConfocal, pol=pol_x);
+    @test psf(sz, pp; pp_ex=pp, pinhole=1.0, sampling=sampling) == psf((sz...,1),pp; pp_ex=pp, pinhole=1.0, sampling=(sampling...,1))[:,:,1]
+end
+
 return

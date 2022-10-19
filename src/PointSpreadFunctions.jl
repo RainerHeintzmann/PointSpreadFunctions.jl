@@ -56,10 +56,15 @@ function psf(::Type{ModeWidefield}, sz::NTuple, pp::PSFParams; sampling=nothing,
             apsf(sz, pp, sampling=sampling)
         end
     end
+
+    res = amp_to_int(amp, pp)
+    if length(sz)<3
+        res = dropdims(res, dims=3)
+    end
     if return_amp
-        return amp_to_int(amp, pp), amp
+        return res, amp
     else
-        return amp_to_int(amp, pp)
+        return res
     end
 end
 
@@ -127,7 +132,11 @@ function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; sampling=nothin
     end
 
     pinhole_pix = pinhole_AU_to_pix(sz, pp_em, sampling, pinhole)
-    return confocal_int(psf_ex, psf_em, pp_em; pinhole_pix=pinhole_pix, pinhole_ft=pinhole_ft, pinhole_positions=pinhole_positions, ex_modifier=ex_modifier)
+    res = confocal_int(psf_ex, psf_em, pp_em; pinhole_pix=pinhole_pix, pinhole_ft=pinhole_ft, pinhole_positions=pinhole_positions, ex_modifier=ex_modifier)
+    if length(sz)<3
+        res = dropdims(res, dims=3)
+    end
+    return res
 end
 
 """

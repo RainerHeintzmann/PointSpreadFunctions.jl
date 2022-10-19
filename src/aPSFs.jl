@@ -11,7 +11,11 @@ function apsf(::Type{MethodParaxial}, sz::NTuple, pp::PSFParams; sampling=nothin
 end
 
 function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
+    sz = (length(sz)>2) ? sz : (sz[1:2]..., 1) # to also work for 2D input sizes
     check_amp_sampling(sz, pp, sampling)
+    if sz[3] < 2
+        error("Method SincR only makes sense for calculating 3D psfs with non-signalton z-size.")
+    end
 
     if isnothing(sampling)
         sampling = get_required_amp_sampling(sz, pp) # this is knowingly too small along kz but fixed down below, if needed.
@@ -109,6 +113,7 @@ end
 
 
 function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
+    sz = (length(sz)>2) ? sz : (sz[1:2]..., 1) # to also work for 2D input sizes
     if isnothing(sampling)
         sampling = get_Ewald_sampling(sz, pp)
         print("Sampling is $sampling \n")
@@ -211,17 +216,9 @@ function apsf(::Type{MethodPropagateIterative}, sz::NTuple, pp::PSFParams; sampl
             (sz[1:2]...,1), (sampling[1:2]..., eps(eltype(sampling))), true
         end
     end
-
     check_amp_sampling(sz, pp, sampling)
      # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
-     slices = normalize_amp_to_plane(apply_propagator_iteratively(sz, pp, sampling=sampling, center_kz=center_kz))
-
-    if is2d
-        return dropdims(slices,dims=3)
-    else
-        return slices # extract the central bit, which avoids the wrap-around effects
-    end
-
+    return normalize_amp_to_plane(apply_propagator_iteratively(sz, pp, sampling=sampling, center_kz=center_kz))
 end
 
 # just a different way of writing the propagation down
@@ -291,7 +288,9 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
     sr = ceil(Int64, diagonal/sampling_r) + 1
     r = xx((sr,), scale=sampling_r, offset=CtrCorner) # a generator for radius
     k = 2pi / (pp.λ / pp.n);
-    kz = yy((1,sz[3]), scale=k*sampling[3])
+    sz3d = (length(sz)>2) ? sz : (sz[1:2]..., 1) # z-size, also working for 2D sizes
+    szz = sz3d[3] 
+    kz = yy((1, szz), scale=k*sampling[3])
     function integrate!(I, w, theta)  # w includes the aplanatic factor
         (sint,cost) = sincos(theta);
         krsint =  (k*sint).*r
@@ -304,7 +303,7 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
     # Now perform the integration according to Simpsons rule
     N = 50
     h = α / N # since these are really N+1 points
-    I012 = zeros(Complex{pp.dtype}, (sr,sz[3],3)) # I0, I1 and I2
+    I012 = zeros(Complex{pp.dtype}, (sr, szz, 3)) # I0, I1 and I2
 
     aplanatic_fct = let
         if pp.polarization == pol_scalar
@@ -343,16 +342,16 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
             3
         end
     end
-    E = zeros(Complex{pp.dtype}, (sz...,numEl)) # I0, I1 and I2
-    _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling)
-    for z = 1:sz[3]
+    E = zeros(Complex{pp.dtype}, (sz3d..., numEl)) # I0, I1 and I2
+    _, rel_kz = get_McCutchen_kz_center((sz[1:2]..., szz),pp,sampling)
+    for z = 1:szz
         I0 = @view I012[:,z,1] # create views to be able to write by 1D indexing into the appropriate slices.
         I1 = @view I012[:,z,2]
         I2 = @view I012[:,z,3]
 
-        z_pos = z - (sz[3]÷2+1)
+        z_pos = z - (szz÷2+1)
 
-        rel_phase = center_kz ? Complex{pp.dtype}(cispi.((-2*rel_kz/sz[3]) .* z_pos)) : one(pp.dtype) # centers the McCutchen pupil to be able to correctly resample it along kz
+        rel_phase = center_kz ? Complex{pp.dtype}(cispi.((-2*rel_kz/szz) .* z_pos)) : one(pp.dtype) # centers the McCutchen pupil to be able to correctly resample it along kz
     
         if pp.polarization == pol_x
             E[:,:,z,1] .= rel_phase .* ((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))

@@ -281,7 +281,7 @@ xx_rfft(dtype, sz; scale=1.0) = to_rfft_pos(xx, dtype, sz; scale=scale)
 yy_rfft(dtype, sz; scale=1.0) = to_rfft_pos(yy, dtype, sz; scale=scale)
 
 function rfft_size(sz)
-    sz = Tuple((d==1 ? sz[d].÷2+1 : sz[d] for d=1:length(sz)))
+    sz = Tuple((d==firstindex(sz) ? sz[d].÷2+1 : sz[d] for d=eachindex(sz)))
 end
 
 # my_disc(sz; rel_border=4/3, eps=0.05) = window_hanning(sz, border_in=rel_border.-eps, border_out=rel_border.+eps)
@@ -529,7 +529,7 @@ end
 """
     normalize_amp_to_plane(apsf, plane=nothing, mydim=3)
 
-normalizes an amplitude PSF such that the intensity sum over the `plane` position along dimension `mydim`.
+normalizes an amplitude PSF such that the intensity sum over the central `plane` position is one. Dimension `mydim` defines the coordinate referring the the slicing.
 """
 function normalize_amp_to_plane(apsf, plane=nothing, mydim=3)
     plane = isnothing(plane) ?  size(apsf,mydim)÷2+1 : plane = plane
@@ -586,13 +586,13 @@ function calc_with_resampling(fct, sz, sampling; norm_amp=true, dims=1:3)
     # Note that the upsampling leads to a one-pixel shift of the center for each odd-size dimension
     # This is taken care of in the select_region code below
     res = upsample2(res_small .* mywin, fix_center=true, keep_singleton=true, dims=dims)
-    res = let
-        if is2d
-            dropdims(res, dims=3)
-        else
-            res
-        end
-    end
+    # res = let
+    #     if is2d
+    #         dropdims(res, dims=3)
+    #     else
+    #         res
+    #     end
+    # end
     # account for the brightness change during rescaling. Only the lateral sizes matter.
     scale = let 
         if norm_amp
