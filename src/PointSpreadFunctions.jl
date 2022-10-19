@@ -5,6 +5,7 @@ using ZernikePolynomials
 export PSFParams, sinc_r, jinc_r_2d, pupil_xyz, apsf, psf, k0, kxy, aplanatic_factor
 export get_Abbe_limit, get_Nyquist_limit, get_pupil_aperture
 export kz_mid_pos
+export modify_STED_exp, modify_STED_hyper, modify_ident, modify_square
 
 export ModeWidefield, ModeConfocal, Mode4Pi, ModeISM, Mode2Photon, ModeSTED
 export MethodRichardsWolf, MethodPropagate, MethodPropagateIterative, MethodShell, MethodSincR
@@ -421,7 +422,7 @@ Returns the PSF or a vector of PSFs.
 + `sz`:         size tuple of the final PSF
 + `pp_ex`:      PSF parameters of the excitation PSF. This should include the exission wavelength (typically in the IR region). Please make sure to also set `pp.aplanatic=aplanatic_illumination`.
 + `pp_ex2`:     PSF parameters of the other side excitation PSF. If `nothing` is provided, single-sided excitation (e.g. 4Pi Type B) is assumed.
-+ `ex_modifier=modify_square`:  If `modify_square`, two-photon exciation is assumed.
++ `ex_modifier=modify_square`:  If `modify_square`, two-photon excitation is assumed.
 + `pp_em`:      PSF parameters of the emission PSF. This only needs to be supplied, if a pinhole is used.
 + `pp_em2`:     PSF parameters of the other side emission PSF. If `nothing is supplied, Type A 4Pi microscopy is assumed with single-sided (or incoherent) detection.`
 + `pinhole=nothing`:   If `nothing`, NDD is assumed and the PSF is only the square of the excitation PSF. The diameter of each pinhole in Airy Units (AU = 1.22 λ/NA). 
