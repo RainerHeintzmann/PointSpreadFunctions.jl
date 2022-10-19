@@ -116,13 +116,14 @@ function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothi
     check_amp_sampling(sz, pp, sampling)
     # the pupil below is the ft of a jinc in real space and includes a factor of my_disc(sz[1:2],pp) to reduce wrap around
     pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
-    pupils = apply_propagators(pupil, sz[3], pp, sampling=sampling)
+    szz = (length(sz)>2) ? sz[3] : 1
+    pupils = apply_propagators(pupil, szz, pp, sampling=sampling)
 
     # return pupils
     # pupils .*= window_hanning((1,1,size(pupils,3)),border_in=0.8,border_out=1.0,dims=(3,))
     if center_kz
         _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling)
-        pupils .*= cispi.((-2*rel_kz/sz[3]) .* zz((1,1,sz[3]))) # centers the McCutchen pupil to be able to correctly resample it along kz
+        pupils .*= cispi.((-2*rel_kz/szz) .* zz((1,1,szz))) # centers the McCutchen pupil to be able to correctly resample it along kz
     end
     if !isnothing(pp.FFTPlan)
         Pm2d = plan_fft(pupils,(1,2), flags=pp.FFTPlan)
@@ -135,7 +136,7 @@ end
 # This function is needed for the propagate method, but iterates between real and Fourier space always smoothly deleting "out-of-bound" waves.
 # The final result is already in real space.
 function apply_propagator_iteratively(sz, pp::PSFParams; sampling, center_kz=false) 
-    z_planes = sz[3]
+    z_planes = (length(sz)>2) ? sz[3] : 1
     # calculate the phase derivatives
     start_z = z_planes÷2+1
     max_pix_travel = (tan(asin(pp.NA / pp.n)) * sampling[3]) ./ sampling[1:2] # how much does the maximal anlge travel geometrically

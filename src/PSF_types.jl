@@ -103,7 +103,7 @@ Structure Members:
 + n:            refractive index of the embedding AND immersion medium
 + dtype:        real-valued data type to generate PSF for
 + mode:         microscopy mode to calculate PSF for. See the constructor PSFParams() for more details.
-+ polarization: a function calculating the polarization from a given Tuple of relative-k pupil vectors
++ polarization: a function calculating the polarization from a given Tuple of relative-k pupil vectors. The constructur argument is `pol`.
 + aplanatic:    aplanatic factor. Provided as a function of angle θ
 + method:       the method of calculation
 + FFTPlan:      information on how to calculate the FFTW plan
@@ -147,7 +147,7 @@ Arguments:
 + λ:            Vacuum emsision wavelength (same units as sampling, default is 0.5 µm)
 + NA:           numerical aperture
 + n:            refractive index of the embedding AND immersion medium
-+ pol: a function calculating the polarization from a given Tuple of relative-k pupil vectors
++ pol:          a function calculating the polarization from a given Tuple of relative-k pupil vectors
 + dtype:        real-valued data type to generate PSF for
 + mode:         microscopy mode to calculate PSF for ::PSFMode. 
 + method:         microscopy mode to calculate PSF for 

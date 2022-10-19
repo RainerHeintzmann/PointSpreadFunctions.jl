@@ -8,12 +8,12 @@ If `pp.transition_dipole` is provided, the dipole transition probability is calc
 + field:    The 4D field to extract the intensity from
 + pp:       Is checked for whether `pp.transition_dipole` is not nothing. 
 """
-function amp_to_int(field, pp)
+function amp_to_int(field::AbstractArray{T,N}, pp) where{T,N}
     if isnothing(pp.transition_dipole)
-        dropdims(sum(abs2.(field), dims=4), dims=4)
+        dropdims(sum(abs2.(field), dims=N), dims=N)
     else
-        transition_dipole = reorient([pp.transition_dipole...], 4, Val(4))
-        dropdims(sum(abs2.(field .* transition_dipole), dims=4), dims=4)
+        transition_dipole = reorient([pp.transition_dipole...], N, Val(N))
+        dropdims(sum(abs2.(field .* transition_dipole), dims=N), dims=N)
     end
 end
 
@@ -527,9 +527,9 @@ function check_amp_sampling_sincr(sz, pp,sampling) # The sinc-r method needs (fo
 end
 
 """
-    normalize_amp_to_plane(apsf, plane=nothing, mydim=4)
+    normalize_amp_to_plane(apsf, plane=nothing, mydim=3)
 
-normalizes an amplitude PSF such that the intensity sum over the `plane` position along dimension `mydim`
+normalizes an amplitude PSF such that the intensity sum over the `plane` position along dimension `mydim`.
 """
 function normalize_amp_to_plane(apsf, plane=nothing, mydim=3)
     plane = isnothing(plane) ?  size(apsf,mydim)÷2+1 : plane = plane

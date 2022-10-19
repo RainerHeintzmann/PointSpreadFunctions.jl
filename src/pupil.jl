@@ -117,7 +117,7 @@ function get_propagator(sz, pp, sampling)
     k_max_rel = sampling[1:2] ./ (pp.λ / pp.n)
     # prop1 = propagator(pp.dtype, sz[1:2], Δz=1, k_max = k_max_rel)
     # prop = cispi.(2 .* phase_kz(pp.dtype, sz[1:2], scale = 1 ./ (k_max_rel .* sz[1:2])))
-    scalar = pp.dtype((2π*sampling[3] / (pp.λ / pp.n)))
+    scalar = (length(sampling) > 2) ? pp.dtype((2π*sampling[3] / (pp.λ / pp.n))) : 1.0
     xy_scale = pp.dtype.(1 ./ (k_max_rel .* sz[1:2]))
     return scalar .* phase_kz(pp.dtype, sz[1:2], scale = xy_scale), scalar, xy_scale
 end
@@ -200,9 +200,9 @@ function get_zernike_pupil_phase(sz, pp, sampling)
     coefficients = pp.aberrations.coefficients
     index = pp.aberrations.index_style
     border = k_pupil_pos(sz[1:2],pp,sampling[1:2])
-    rho = rr(pp.dtype, sz, scale = one(pp.dtype)./border)
+    rho = rr(pp.dtype, sz[1:2], scale = one(pp.dtype)./border)
     rho = min.(rho, one(pp.dtype))
-    phi = phiphi(pp.dtype, sz, scale = one(pp.dtype)./border)
+    phi = phiphi(pp.dtype, sz[1:2], scale = one(pp.dtype)./border)
     # X = ramp(pp.dtype, 1,sz[1],scale = 1/border[1])
     # X = min.(X, one(pp.dtype))
     # Y = ramp(pp.dtype, 1,sz[2],scale = 1/border[2])
