@@ -218,7 +218,7 @@ function confocal_int(psf_ex, psf_em, pp_em;  pinhole_pix=nothing, pinhole_ft=di
     # pinhole = real.(ift2d(jinc_r_2d(sz, pinhole .* AU_pix, pp_em.dtype)))
     # pinhole_ft = rfft2d(ifftshift(pinhole))
 
-    all_PSFs = [];
+    all_PSFs = Vector{typeof(psf_em)}();
     sz = size(psf_em)
 
     # apply two-photon or STED effect 
@@ -336,7 +336,7 @@ function psf(::Type{ModeISM}, sz::NTuple, pp_em::PSFParams; pinhole=nothing, sam
             pinhole = ph_diam
         end
     end
-    psf(ModeConfocal, sz, pp_em; pinhole=pinhole, sampling=sampling, pinhole_ft=pinhole_ft,pinhole_positions=pinhole_positions, args...) # confocal is able to handle this well
+    psf(ModeConfocal, sz, pp_em; pinhole=pinhole, sampling=sampling, pinhole_ft=pinhole_ft, pinhole_positions=pinhole_positions, args...) # confocal is able to handle this well
 end
 
 """

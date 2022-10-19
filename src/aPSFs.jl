@@ -302,9 +302,12 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
     h = α / N # since these are really N+1 points
     I012 = zeros(Complex{pp.dtype}, (sr, szz, 3)) # I0, I1 and I2
 
+    # I think this code is wrong and according to C. Sheppard this should be simply
+    # aplanatic_fct = pp.aplanatic
+    # all the other functions need to account for 1/cos(theta) due to the projection of the k-sphere. 
     aplanatic_fct = let
         if pp.polarization == pol_scalar
-            pp.aplanatic
+            # pp.aplanatic
             (θ) -> pp.aplanatic(θ) .* sqrt.(max.(cos.(θ),zero(typeof(θ))))
         else
             # pp.aplanatic
