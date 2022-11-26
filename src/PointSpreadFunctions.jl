@@ -235,7 +235,7 @@ function confocal_int(psf_ex, psf_em, pp_em;  pinhole_pix=nothing, pinhole_ft=di
             # pinhole_ft = rfft2d(ifftshift(pinhole))
             # return pinhole_ft
             my_em =  irfft2d(rfft_psf_em .* my_pinhole_ft, sz[1])
-            push!(all_PSFs, my_em .* psf_ex)
+            push!(all_PSFs, my_em ) # .* psf_ex
             # push!(all_PSFs, irfft2d(my_pinhole_ft, sz[1]))  # only for diagnostic purposes
         end
     end
@@ -287,8 +287,15 @@ function AU_per_pixel(pp, sampling)
     return AU_pix
 end
 
+"""
+    exp_ikx_rfft(dtype, sz; shift_by)
+
+calculates the exp factor for an rfft to result into shifting the corresponding real array by `shift_by`.
+"""
 function exp_ikx_rfft(dtype, sz; shift_by)
     szrfft = rfft_size(sz)
+    # this is needed to account for the exp_ikx function being designed for FFTs rather than rfts
+    shift_by = shift_by .* eltype(shift_by).(szrfft[1:2] ./ sz[1:2])
     ifftshift(exp_ikx(Complex{dtype}, szrfft[1:2], offset=CtrRFT, shift_by=shift_by), (2:length(sz)))
 end
 
