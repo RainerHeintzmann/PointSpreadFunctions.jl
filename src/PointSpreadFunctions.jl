@@ -235,7 +235,7 @@ function confocal_int(psf_ex, psf_em, pp_em;  pinhole_pix=nothing, pinhole_ft=di
             # pinhole_ft = rfft2d(ifftshift(pinhole))
             # return pinhole_ft
             my_em =  irfft2d(rfft_psf_em .* my_pinhole_ft, sz[1])
-            push!(all_PSFs, my_em ) # .* psf_ex
+            push!(all_PSFs, my_em .* psf_ex) # 
             # push!(all_PSFs, irfft2d(my_pinhole_ft, sz[1]))  # only for diagnostic purposes
         end
     end
