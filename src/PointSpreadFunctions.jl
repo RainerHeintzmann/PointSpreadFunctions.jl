@@ -83,7 +83,7 @@ Returns the PSF or a vector of PSFs.
 + `sampling=nothing`:   The sampling parameters of the resulting PSF.
 + `use_resampling=true`: Exploits a calculation trick, which first calculates the individual PSFs on a twice coarser grid in XY and Z and then upsamples the result. Note that this may be inappropriate due to undersampling due to the Stokes shift which is neglected here. But warnings will then result during the calculations of the subsampled widefield PSFs.
 + `return_amp=false`:    Has to be `false` since confocal amplitude spread functions do not exist for non-zero pinhole sizes. 
-+ `pinhole_positions=[(0.0,0.0)]`:  A list of pinhole positions. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs. Specifies the precise position(s) of the pinholes in the detection path. This allows to simulate an offset (misadjusted) pinhole, or (as a vector of tuples) a PSF for a whole set of positions. See the `psf(ModeISM, ...)` for more details. 
++ `pinhole_positions=[(0.0,0.0)]`:  A list of pinhole positions in pixels. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs. Specifies the precise position(s) of the pinholes in the detection path. This allows to simulate an offset (misadjusted) pinhole, or (as a vector of tuples) a PSF for a whole set of positions. See the `psf(ModeISM, ...)` for more details. 
 + `pinhole_ft=disc_pinhole_ft`:  Specifies which function is used to calculate the Fourier transform of the pinhole. This allows the user to control the pinhole shape. 
 + `ex_modifier`:   A function that can modify the excitation PSF. By default the identity is used, but other options are `modify_square` to calculate a two-photon confocal PSF. However, you should typically use the `Mode2Photon` to do this. Note that the order of the PSFParams are reversed.
 
@@ -317,10 +317,9 @@ Returns the PSF or a vector of PSFs.
 + `sampling=nothing`:   The sampling parameters of the resulting PSF.
 + `use_resampling=true`: Exploits a calculation trick, which first calculates the individual PSFs on a twice coarser grid in XY and Z and then upsamples the result. Note that this may be inappropriate due toundersampling due to the Stokes shift which is neglected here. But warnings will then result during the calculations of the subsampled widefield PSFs.
 + `return_amp=false`:    Has to be `false` since confocal amplitude spread functions do not exist for non-zero pinhole sizes. 
-+ `pinhole_positions=nothing`:  A list of pinhole positions. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs.
++ `pinhole_positions=nothing`:  A list of pinhole positions in pixel coordinates. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs. Be careful, since this is not the same as the position of the relative shift of the images.
 + `pinhole_dist=0.5`: a value or tuple specified the distances between pinholes, when arranged in a grid. 
 + `pinhole_ft=box_pinhole_ft`:  Specifies which function is used to calculate the Fourier transform of the pinhole. This allows the user to control the pinhole shape. E.g. hexagonal pattern with round pinholes
-+ `pinhole_positions=nothing`:  Specifies the precise positions of the pinholes in the detection pathway. Be careful, since this is not the same as the position of the relative shift of the images.
 
 ```julia-repl
 julia> sz=(128,128,128); sampling = (0.04,0.04,0.120)
@@ -361,7 +360,7 @@ Returns the PSF or a vector of PSFs.
 + `sampling=nothing`:   The sampling parameters of the resulting PSF.
 + `use_resampling=true`: Exploits a calculation trick, which first calculates the individual PSFs on a twice coarser grid in XY and Z and then upsamples the result. Note that this may be inappropriate due toundersampling due to the Stokes shift which is neglected here. But warnings will then result during the calculations of the subsampled widefield PSFs.
 + `return_amp=false`:    Has to be `false` since confocal amplitude spread functions do not exist for non-zero pinhole sizes. 
-+ `pinhole_positions=[(0.0,0.0)]`:  A list of pinhole positions. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs.
++ `pinhole_positions=[(0.0,0.0)]`:  A list of pinhole positions in pixels. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs.
 
 ```julia-repl
 julia> sz=(128,128,128); sampling = (0.04,0.04,0.120)
@@ -393,7 +392,7 @@ Returns the PSF or a vector of PSFs.
 + `sampling=nothing`:   The sampling parameters of the resulting PSF.
 + `use_resampling=true`: Exploits a calculation trick, which first calculates the individual PSFs on a twice coarser grid in XY and Z and then upsamples the result. Note that this may be inappropriate due toundersampling due to the Stokes shift which is neglected here. But warnings will then result during the calculations of the subsampled widefield PSFs.
 + `return_amp=false`:    Has to be `false` since confocal amplitude spread functions do not exist for non-zero pinhole sizes. 
-+ `pinhole_positions=[(0.0,0.0)]`:  A list of pinhole positions. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs.
++ `pinhole_positions=[(0.0,0.0)]`:  A list of pinhole positions in pixels. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs.
 
 ```julia-repl
 julia> sz=(128,128,128); sampling = (0.04,0.04,0.120)
@@ -434,7 +433,7 @@ Returns the PSF or a vector of PSFs.
 + `pp_em2`:     PSF parameters of the other side emission PSF. If `nothing is supplied, Type A 4Pi microscopy is assumed with single-sided (or incoherent) detection.`
 + `pinhole=nothing`:   If `nothing`, NDD is assumed and the PSF is only the square of the excitation PSF. The diameter of each pinhole in Airy Units (AU = 1.22 λ/NA). 
 + `sampling=nothing`:   The sampling parameters of the resulting PSF.
-+ `pinhole_positions=[(0.0,0.0)]`:  A list of pinhole positions. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs.
++ `pinhole_positions=[(0.0,0.0)]`:  A list of pinhole positions in pixels. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs.
 
 ```julia-repl
 julia> sampling = (0.04,0.04,0.04)
