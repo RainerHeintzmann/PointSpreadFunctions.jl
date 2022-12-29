@@ -13,7 +13,7 @@ function amp_to_int(field::AbstractArray{T,N}, pp) where{T,N}
         dropdims(sum(abs2.(field), dims=N), dims=N)
     else
         transition_dipole = reorient([pp.transition_dipole...], N, Val(N))
-        dropdims(sum(abs2.(field .* transition_dipole), dims=N), dims=N)
+        dropdims(abs2.(sum(field .* transition_dipole, dims=N)), dims=N)
     end
 end
 
