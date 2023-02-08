@@ -298,7 +298,7 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
     end
     α = asin(pp.NA / pp.n); # maximal aperture angle
     # Now perform the integration according to Simpsons rule
-    N = 50
+    N = 150 # 50 does not seem to be good enough
     h = α / N # since these are really N+1 points
     I012 = zeros(Complex{pp.dtype}, (sr, szz, 3)) # I0, I1 and I2
 
@@ -324,6 +324,7 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
             integrate!(I012, 2*h/6*aplanatic_fct(theta), theta) # intermediate values (count twice in the sum)
         end
     end
+
     integrate!(I012, h/6*aplanatic_fct(α), α) # last value
 
     # Interpolate the RZ-results onto the 3D grid
