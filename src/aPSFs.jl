@@ -281,20 +281,21 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
     end
     sz, sampling = size_sampling_to3d(sz, sampling)
 
-    sampling_r = min(sampling[1],sampling[2])/2.0
+    sampling_r = min(sampling[1],sampling[2])/3
     diagonal = sqrt(sum(abs2.(sz[1:2] .* sampling[1:2]))) / 2.0;
     sr = ceil(Int64, diagonal/sampling_r) + 1
+    # @show sr
     r = xx((sr,), scale=sampling_r, offset=CtrCorner) # a generator for radius
     k = 2pi / (pp.λ / pp.n);
     szz = sz[3] 
     kz = yy((1, szz), scale=k*sampling[3])
     function integrate!(I, w, theta)  # w includes the aplanatic factor
-        (sint,cost) = sincos(theta);
+        (sint,cost) = @fastmath sincos(theta);
         krsint =  (k*sint).*r
-        ciskzcost =  cis.(kz.*cost)
-        I[:,:,1] .+= (w* sint*(1+cost)).*besselj0.(krsint) .* ciskzcost
-        I[:,:,2] .+= (w* sint^2) .*besselj1.(krsint) .* ciskzcost
-        I[:,:,3] .+= (w* sint.*(1-cost)).*besselj.(2,krsint) .* ciskzcost
+        ciskzcost =  @fastmath cis.(kz.*cost)
+        I[:,:,1] .+= (w* sint*(1+cost)).*(@fastmath besselj0.(krsint)) .* ciskzcost
+        I[:,:,2] .+= (w* sint^2) .*(@fastmath besselj1.(krsint)) .* ciskzcost
+        I[:,:,3] .+= (w* sint.*(1-cost)).*(@fastmath besselj.(2,krsint)) .* ciskzcost
     end
     α = asin(pp.NA / pp.n); # maximal aperture angle
     # Now perform the integration according to Simpsons rule
@@ -314,7 +315,6 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
             (θ) -> pp.aplanatic(θ) .* max.(cos.(θ),zero(typeof(θ)))
         end
     end
-
     integrate!(I012, h/6*aplanatic_fct(0.0), 0.0) # first value
     for n in 0:N-1 # integrate using Simpsons rule
         theta = h*(n+0.5) # middle value(s)
@@ -329,13 +329,14 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
 
     # Interpolate the RZ-results onto the 3D grid
     phi = phiphi((sz[1],sz[2]), scale=(sampling[1],sampling[2]))
-    sinphi = sin.(phi)
-    cosphi = cos.(phi)
-    cos2phi = cos.(2 .*phi)
-    sin2phi = sin.(2 .*phi)
+    sinphi = @fastmath sin.(phi)
+    cosphi = @fastmath cos.(phi)
+    cos2phi = @fastmath cos.(2 .*phi)
+    sin2phi = @fastmath sin.(2 .*phi)
     rpos = rr((sz[1],sz[2]), scale=(sampling[1],sampling[2]))
     r_idx = 1 .+ floor.(Int64, rpos ./ sampling_r) # index position
-    w = 1.0 .- (rpos/ sampling_r .+ 1 .- r_idx) # index position
+    # @show findall(r_idx.<4)
+    w = 1.0 .- (rpos./sampling_r .+ 1 .- r_idx) # index position
     numEl = let 
         if pp.polarization == pol_scalar
             1
@@ -345,6 +346,19 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
     end
     E = zeros(Complex{pp.dtype}, (sz..., numEl)) # I0, I1 and I2
     _, rel_kz = get_McCutchen_kz_center((sz[1:2]..., szz),pp,sampling)
+
+    interp_lin(vals) = (w.*(@view vals[r_idx]).+(1 .-w).*(@view vals[r_idx.+1]))
+
+    # Langrange's quadratic interpolation
+    # coefficients 
+    L0 = (w.-1).*w./2  # (x - x1)(x -x2) / 2  # x0 = -1, x1 = 0, x2 = 1, w = (1 -x)  --> x = (1 - w)
+    L1 = (2 .-w).*w./1  # -(x - x0)(x -x2) # 
+    L2 = (2 .-w).*(1 .-w)./2 # (x-x0)(x-x1)/2 
+    interp_sqr(vals) = L0 .*(@view vals[abs.(r_idx.-2).+1]) .+
+                       L1 .*(@view vals[r_idx]) .+
+                       L2 .*(@view vals[r_idx.+1])
+    interp = interp_sqr;
+
     for z = 1:szz
         I0 = @view I012[:,z,1] # create views to be able to write by 1D indexing into the appropriate slices.
         I1 = @view I012[:,z,2]
@@ -352,24 +366,24 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
 
         z_pos = z - (szz÷2+1)
 
-        rel_phase = center_kz ? Complex{pp.dtype}(cispi.((-2*rel_kz/szz) .* z_pos)) : one(pp.dtype) # centers the McCutchen pupil to be able to correctly resample it along kz
+        rel_phase = center_kz ? Complex{pp.dtype}(@fastmath cispi.((-2*rel_kz/szz) .* z_pos)) : one(pp.dtype) # centers the McCutchen pupil to be able to correctly resample it along kz
     
         if pp.polarization == pol_x
-            E[:,:,z,1] .= rel_phase .* ((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]))
-            E[:,:,z,2] .= rel_phase .* (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi
-            E[:,:,z,3] .= rel_phase .* (2im .* .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*cosphi)
+            E[:,:,z,1] .= rel_phase .* (interp(I0).+cos2phi.*interp(I2))
+            E[:,:,z,2] .= rel_phase .* interp(I2).*sin2phi
+            E[:,:,z,3] .= rel_phase .* (2im .* interp(I1).*cosphi)
         elseif pp.polarization == pol_y
-            E[:,:,z,1] .= rel_phase .* (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi # sin2phi with pi/2 phase shift becomes -sin2phi
-            E[:,:,z,2] .= rel_phase .* ((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).-cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])) # cos2phi becomes -cos2phi
-            E[:,:,z,3] .= rel_phase .* 2im .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*sinphi # cosphi becomes -sinphi 
+            E[:,:,z,1] .= rel_phase .* interp(I2).*sin2phi # sin2phi with pi/2 phase shift becomes -sin2phi
+            E[:,:,z,2] .= rel_phase .* (interp(I0).-cos2phi.*interp(I2)) # cos2phi becomes -cos2phi
+            E[:,:,z,3] .= rel_phase .* 2im .*interp(I1).*sinphi # cosphi becomes -sinphi 
         elseif pp.polarization == pol_circ # pol_x + im* pol_y
-            E[:,:,z,1] .= rel_phase .* (1/sqrt(2).*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).+cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])) .+
-            im/sqrt(2)*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi)
-            E[:,:,z,2] .= rel_phase .* (1/sqrt(2).*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]).*sin2phi .+
-            im/sqrt(2)*((w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]).-cos2phi.*(w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1])))
-            E[:,:,z,3] .= rel_phase .* (2im/sqrt(2)*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1]).*(cosphi .+ im * sinphi))
+            E[:,:,z,1] .= rel_phase .* (1/sqrt(2).*(interp(I0).+cos2phi.*interp(I2)) .+
+            im/sqrt(2)*interp(I2).*sin2phi)
+            E[:,:,z,2] .= rel_phase .* (1/sqrt(2).*interp(I2).*sin2phi .+
+            im/sqrt(2)*(interp(I0).-cos2phi.*interp(I2)))
+            E[:,:,z,3] .= rel_phase .* (2im/sqrt(2)*interp(I1).*(cosphi .+ im * sinphi))
         elseif pp.polarization == pol_scalar # scalar approximation
-            E[:,:,z,1] .= rel_phase .* (w.*I0[r_idx].+(1 .-w).*I0[r_idx.+1]) # .+ (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]) .+ 1 .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1])
+            E[:,:,z,1] .= rel_phase .* interp(I0) # .+ (w.*I2[r_idx].+(1 .-w).*I2[r_idx.+1]) .+ 1 .*(w.*I1[r_idx].+(1 .-w).*I1[r_idx.+1])
         else
             error("unsupported polarization for Richards-Wolf method")
         end
