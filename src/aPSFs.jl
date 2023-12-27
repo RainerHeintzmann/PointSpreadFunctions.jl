@@ -357,6 +357,15 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
     interp_sqr(vals) = L0 .*(@view vals[abs.(r_idx.-2).+1]) .+
                        L1 .*(@view vals[r_idx]) .+
                        L2 .*(@view vals[r_idx.+1])
+    # some code to test the quadratic interpolation
+    # test_fun(p) = (p + 17.321)^2; # quadratic function to test with
+    # test_vals = test_fun.(rpos ./ sampling_r) # true values
+    # test_table = test_fun.(0:1000); # a table to interpolate from
+    # @show maximum(abs.(test_vals .- interp_sqr(test_table))) # smaller than 10^-9
+    # return rpos ./ sampling_r, test_vals, interp_sqr(test_table) 
+    # code to test: t1,t2 = apsf(MethodRichardsWolf, (256,256,1), pp, sampling=samp)
+    # @vt t1 t2
+
     interp = interp_sqr;
 
     for z = 1:szz
