@@ -10,7 +10,8 @@ makedocs(modules=[PointSpreadFunctions], sitename="PSFs Documentation", doctest 
         "Function references" => Any[
                     "function_references/all_functions.md",
                     ]
-                    ]
+                    ],
+        warnonly=true,
         )
 
 deploydocs(repo = "github.com/RainerHeintzmann/PointSpreadFunctions.jl.git", devbranch = "main")
