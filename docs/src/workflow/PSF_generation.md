@@ -1,7 +1,7 @@
-# PSF calculation
+# PointSpreadFunction calculation
 
 ```@docs
-PSFs.psf
-PSFs.apsf
+PointSpreadFunctions.psf
+PointSpreadFunctions.apsf
 ```
 
