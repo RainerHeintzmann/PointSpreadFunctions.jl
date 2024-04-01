@@ -129,6 +129,7 @@ end
 
     pp = PSFParams(0.5,1.3,1.52; mode=ModeConfocal, pol=pol_x);
     @test psf(sz, pp; pp_ex=pp, pinhole=1.0, sampling=sampling) == psf((sz...,1),pp; pp_ex=pp, pinhole=1.0, sampling=(sampling...,1))[:,:,1]
+    @test psf((16,16,16), PSFParams(0.5,1.4,1.52); sampling=(0.05,0.05,0.05)) != 0 # to test for a bug in NDTools.select_region
 end
 
 return
