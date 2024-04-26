@@ -182,6 +182,13 @@ function psf(::Type{ModeLightsheet}, sz::NTuple, pp_em::PSFParams; sampling=noth
     if isnothing(sigma_z)
         # check th z-sampling.   WRONG!!!:
         max_samp_ex = get_amp_sampling_xy(sz_ex, pp_ex, sampling_ex)
+        if (ex_modifier != modify_ident)
+            if (ex_modifier == modify_square)
+                max_samp_ex = max_samp_ex./2;
+            else
+                warn("unsupported excitation modifyer for the sampling calculation")
+            end
+        end
         max_samp_em = get_amp_sampling_z(sz, pp_em, sampling)
         max_samp_total = 1/(1/max_samp_ex[1] + 1/max_samp_em);
         if (sampling[3] > max_samp_total)
