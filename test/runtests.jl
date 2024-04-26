@@ -81,6 +81,22 @@ end
     @test ctr_test(pc_open, pw_ex, 0.15)
 end
 
+@testset "lightsheet PSF" begin
+    sz = (64,64,64)
+    pp_em = PSFParams(0.5,0.9,1.33; mode=ModeLightsheet);
+    pp_ex = PSFParams(0.488, 0.2, 1.33);
+    p_lightsheet1 = psf(sz, pp_em; pp_ex=pp_ex, sampling=(0.040,0.040,0.100), dynamically_scanned=true);
+    p_lightsheet2 = psf(sz, pp_em; pp_ex=pp_ex, sampling=(0.040,0.040,0.100), dynamically_scanned=false);
+    p_lightsheetg = psf(sz, pp_em; sampling=(0.040,0.040,0.100), sigma_z=1.0);
+
+    @test size(p_lightsheet1) == sz
+    @test size(p_lightsheet2) == sz
+    @test size(p_lightsheetg) == sz
+    @test p_lightsheet1[33,33,33] > p_lightsheet2[33,33,33]
+    @test p_lightsheetg[33,33,33] > p_lightsheet1[33,33,33]
+    @test p_lightsheetg[33,33,33] > p_lightsheetg[33,33,30]
+end
+
 @testset "ISM PSF" begin
     sampling = (0.04,0.04,0.120)
     sz = (128,128,128)
