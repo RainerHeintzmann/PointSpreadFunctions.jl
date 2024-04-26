@@ -7,7 +7,7 @@ export get_Abbe_limit, get_Nyquist_limit, get_pupil_aperture
 export kz_mid_pos
 export modify_STED_exp, modify_STED_hyper, modify_ident, modify_square
 
-export ModeWidefield, ModeConfocal, Mode4Pi, ModeISM, Mode2Photon, ModeSTED
+export ModeWidefield, ModeConfocal, Mode4Pi, ModeISM, Mode2Photon, ModeSTED, ModeLightsheet
 export MethodRichardsWolf, MethodPropagate, MethodPropagateIterative, MethodShell, MethodSincR
 
 include("aplanatic.jl")
@@ -70,7 +70,7 @@ function psf(::Type{ModeWidefield}, sz::NTuple, pp::PSFParams; sampling=nothing,
 end
 
 """
-    psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, pinhole=nothing, pinhole_ft=disc_pinhole_ft, sampling=nothing, use_resampling=true, return_amp=false, pinhole_positions=[(0.0,0.0)]) # unclear why the resampling seems to be so bad
+    psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, pinhole=nothing, pinhole_ft=disc_pinhole_ft, sampling=nothing, use_resampling=true, return_amp=false, pinhole_positions=[(0.0,0.0)], ex_modifier=modify_ident) # unclear why the resampling seems to be so bad
 
 Calculates a confocal point spread function. The normalisation is such that a completely open `pinhole` diameter yields the excitation PSF with its normalization. 
 Returns the PSF or a vector of PSFs.
@@ -86,6 +86,7 @@ Returns the PSF or a vector of PSFs.
 + `pinhole_positions=[(0.0,0.0)]`:  A list of pinhole positions in pixels. One PSF will be returned for each pinhole position. If only a single pinhole position is supplied the PSF will directly be returned instead of a vector of PSFs. Specifies the precise position(s) of the pinholes in the detection path. This allows to simulate an offset (misadjusted) pinhole, or (as a vector of tuples) a PSF for a whole set of positions. See the `psf(ModeISM, ...)` for more details. 
 + `pinhole_ft=disc_pinhole_ft`:  Specifies which function is used to calculate the Fourier transform of the pinhole. This allows the user to control the pinhole shape. 
 + `ex_modifier`:   A function that can modify the excitation PSF. By default the identity is used, but other options are `modify_square` to calculate a two-photon confocal PSF. However, you should typically use the `Mode2Photon` to do this. Note that the order of the PSFParams are reversed.
+    By default (modify_ident), no modication is performed.
 
 ```julia-repl
 julia> pp_em = PSFParams(0.5,1.4,1.52; mode=ModeConfocal);
@@ -134,6 +135,100 @@ function psf(::Type{ModeConfocal}, sz::NTuple, pp_em::PSFParams; sampling=nothin
 
     pinhole_pix = pinhole_AU_to_pix(sz, pp_em, sampling, pinhole)
     res = confocal_int(psf_ex, psf_em, pp_em; pinhole_pix=pinhole_pix, pinhole_ft=pinhole_ft, pinhole_positions=pinhole_positions, ex_modifier=ex_modifier)
+    if length(sz)<3
+        res = dropdims(res, dims=3)
+    end
+    return res
+end
+
+"""
+    psf(::Type{ModeLightsheet}, sz::NTuple, pp_em::PSFParams; pp_ex=nothing, sampling=nothing, use_resampling=true, dynamically_scanned=false) # unclear why the resampling seems to be so bad
+
+Calculates a point spread function for a lightsheet microscopy. Not that the coordinate system refers to the detection PSF. The NA of the 
+excitation PSF refers to the Z and Y direction. The polarisation of the excitation PSF along X means along Z and along Y means along Y in the final volume.
+Note that the excitation is assumed for the best focus position (beam waist). In reality the PSF will be spatially dependent due to the excitation focus.
+
+# Parameters
++ `sz`:         size tuple of the final PSF
++ `pp_em`:      PSF parameters of the emission PSF. PSF parameters of the PSF. See `PSFParams()` for details. This should include the emission wavelength
++ `pp_ex=nothing`:      This is a required named parameter, containing all the settings for the excitation PSF. This should include the excitation wavelength as well as typically `aplanatic=aplanatic_illumination`.
++ `pinhole=nothing`:    The diameter of the pinhole in Airy Units (AU = 1.22 λ/NA). A pinhole size of one AU corresponds to a pinhole border falling onto the first zero of a corresponding paraxial emission PSF.
++ `sampling=nothing`:   The sampling parameters of the resulting PSF.
++ `use_resampling=true`: Exploits a calculation trick, which first calculates the individual PSFs on a twice coarser grid in XY and Z and then upsamples the result. Note that this may be inappropriate due to undersampling due to the Stokes shift which is neglected here. But warnings will then result during the calculations of the subsampled widefield PSFs.
++ 'dynamically_scanned': specifies, whether the lightsheet uses a dynamically scanned beam. This is important for the calculation of the PSF. If the beam is scanned, the PSF will be calculated in the same way as for a confocal PSF. If the beam is not scanned, the excitation PSF will be assuming a focussing via a cylinder lens.
++ `ex_modifier`:   A function that can modify the excitation PSF. By default the identity is used, but other options are `modify_square` to calculate a two-photon confocal PSF. However, you should typically use the `Mode2Photon` to do this. Note that the order of the PSFParams are reversed.
+    By default (modify_ident), no modication is performed.
++ sigma_z = nothing: If the user provides a sigma_z value, the excitation calculation is using a Guassian excitation PSF with the specified sigma. pp_ex is ignored.
+
+```julia-repl
+julia> pp_em = PSFParams(0.5,0.9,1.33; mode=ModeLightsheet);
+julia> pp_ex = PSFParams(0.488, 0.2, 1.33);
+julia> p_lightsheet = psf((128,128,128), pp_em; pp_ex=pp_ex, sampling=(0.040,0.040,0.100), dynamically_scanned=true);
+julia> p_lightsheet_gauss = psf((128,128,128), pp_em; sampling=(0.040,0.040,0.100), sigma_z=1.0); # Gaussian excitation PSF
+```
+"""
+function psf(::Type{ModeLightsheet}, sz::NTuple, pp_em::PSFParams; sampling=nothing, pp_ex=nothing, use_resampling=true, dynamically_scanned=false, ex_modifier=modify_ident, sigma_z = nothing) # unclear why the resampling seems to be so bad
+    if isnothing(pp_ex) && isnothing(sigma_z) 
+        error("The named parameter `pp_ex` is obligatory for lightsheet calculation. Provide the excitation PSF parameters here.")
+    end
+
+    # check the sampling for the widefield emission PSF
+    check_amp_sampling_xy(sz, pp_em, sampling)
+
+    # switch coordinates and sampling for the excitation PSF
+    sz_ex = (sz[3], sz[2], sz[3])
+    sampling_ex = (sampling[3], sampling[2], sampling[3])
+
+    if isnothing(sigma_z)
+        # check th z-sampling.   WRONG!!!:
+        max_samp_ex = get_amp_sampling_xy(sz_ex, pp_ex, sampling_ex)
+        max_samp_em = get_amp_sampling_z(sz, pp_em, sampling)
+        max_samp_total = 1/(1/max_samp_ex[1] + 1/max_samp_em);
+        if (sampling[3] > max_samp_total)
+            warn("The z-sampling of the lightsheet PSF is undersampled. The z-sampling should be at least $max_samp_total. The current z-sampling is $(sampling[3]).")
+        end
+    end
+
+    psf_ex = let
+        if isnothing(sigma_z)
+            psf_ex = let        
+                if !(dynamically_scanned)
+                    # force it to calculate only the central slice. In this way a coherent cylinder illumination is calculated
+                    sz_ex = (sz_ex[1], 1, sz_ex[3])
+                end
+
+                if use_resampling
+                    fct_ex = (sz,my_sampling) -> psf(ModeWidefield, sz, pp_ex; sampling=my_sampling, use_resampling=use_resampling)
+                    calc_with_resampling(fct_ex, sz_ex, sampling_ex, norm_amp=false)
+                else
+                    psf(ModeWidefield, sz_ex, pp_ex; sampling=sampling, use_resampling=use_resampling)
+                end
+            end
+            psf_ex = permutedims(psf_ex, (3,2,1))
+            if (dynamically_scanned)
+                # perform the incoherent averaging of intensity.
+                psf_ex = sum(psf_ex, dims=2) # because it averages over the Y-direction during scanning
+            end
+        else
+            psf_ex =  gaussian((1,1,sz[3]), sigma=(1,1, sigma_z./sampling[3]));
+        end
+        psf_ex
+    end
+
+    # apply the two-photon effect for excitation if needed.
+    psf_ex =  ex_modifier(psf_ex) 
+
+    # pp_em = PSFParams(pp, mode = ModeWidefield)
+    psf_em = let
+        if use_resampling
+            fct_em = (sz,my_sampling) -> psf(ModeWidefield, sz,pp_em; sampling=my_sampling, use_resampling=use_resampling)
+            calc_with_resampling(fct_em, sz, sampling, norm_amp=false)
+        else
+            psf(ModeWidefield, sz, pp_em; sampling=sampling, use_resampling=use_resampling)
+        end
+    end
+
+    res = psf_ex .* psf_em
     if length(sz)<3
         res = dropdims(res, dims=3)
     end

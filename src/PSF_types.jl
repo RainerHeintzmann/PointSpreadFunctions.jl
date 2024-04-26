@@ -1,6 +1,7 @@
 abstract type PSFMode end
 struct ModeWidefield <: PSFMode end
 struct ModeConfocal <: PSFMode end
+struct ModeLightsheet <: PSFMode end
 struct ModeISM <: PSFMode end
 struct Mode2Photon <: PSFMode end
 struct Mode4Pi <: PSFMode end
@@ -150,13 +151,21 @@ Arguments:
 + pol:          a function calculating the polarization from a given Tuple of relative-k pupil vectors
 + dtype:        real-valued data type to generate PSF for
 + mode:         microscopy mode to calculate PSF for ::PSFMode. 
+    + ModeWidefield (default): Widefield microscopy
+    + Mode2Photon: Two-photon microscopy
+    + Mode4Pi: 4Pi microscopy
+    + ModeConfocal: Confocal microscopy
+    + ModeISM: Image scanning microscopy
+    + ModeSTED: stimulated emission depletion microscopy
+    + ModeLSCylinder: Light-sheet microscopy illuminating with a cylindrical lens
+    + ModeDSLM: Dynamically scanned light-sheet microscopy
 + method:         microscopy mode to calculate PSF for 
                 valid options are currently:
-                + MethodPropagate: Angulare spectrum propagation. This version does NOT account for wrap around problems yielding problems at larger out-of-focus distances
-                + MethodPropagateIterativ (default): Angulare spectrum propagation accounting from wrap-around problems in each propagation step by applying a perfectly matched layer (PML).
-                + MethodShell: Angulare spectrum propagation with a slightly different calculation order. This version does NOT account for wrap around problems yielding problems at larger out-of-focus distances
-                + MethodSincR: Based on first calculating a SincR function in real space and applying consecutive filtering steps. It accounts for wrap around problems but requires a quite high sampling along the Z direction.
-                + MethodRichardsWolf: Uses the method described in the paper by B. Richards and E. Wolf, "Electromagnetic diffraction in optical systems. II. structure of the image field in an aplanatic system," Proc. R. Soc. London A, vol. 253, no. 1274, 1959.
+    + MethodPropagate: Angulare spectrum propagation. This version does NOT account for wrap around problems yielding problems at larger out-of-focus distances
+    + MethodPropagateIterativ (default): Angulare spectrum propagation accounting from wrap-around problems in each propagation step by applying a perfectly matched layer (PML).
+    + MethodShell: Angulare spectrum propagation with a slightly different calculation order. This version does NOT account for wrap around problems yielding problems at larger out-of-focus distances
+    + MethodSincR: Based on first calculating a SincR function in real space and applying consecutive filtering steps. It accounts for wrap around problems but requires a quite high sampling along the Z direction.
+    + MethodRichardsWolf: Uses the method described in the paper by B. Richards and E. Wolf, "Electromagnetic diffraction in optical systems. II. structure of the image field in an aplanatic system," Proc. R. Soc. London A, vol. 253, no. 1274, 1959.
                             The terms I0, I1 and I2 are first calculated for an radial Z-dependet profile and then interpolated onto the 3D volume.
 + aplanatic:    aplanatic factor. Provided as a function of angle θ. Choices are `aplanatic_const`, `aplanatic_detection`, `aplanatic_illumination`, `aplanatic_illumination_flux`
 + FFTPlan:      information on how to calculate the FFTW plan. Default: nothing (using FFTW.ESTIMATE)

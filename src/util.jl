@@ -466,6 +466,11 @@ function check_amp_sampling_xy(sz, pp,sampling)
     end
 end
 
+function get_amp_sampling_xy(sz, pp,sampling)
+    sample_factor = k_pupil(pp) ./ ((sz[1:2] .÷2) .* k_scale(sz, pp, sampling)[1:2])
+    return sampling[1:2] ./ sample_factor;
+end
+
 """
     check_amp_sampling_z(sz, pp,sampling)
 
@@ -482,12 +487,19 @@ Arguments:
 + `pp`:  PSF parameter structure
 + `sampling`: pixelpitch in real space as NTuple
 """
-function check_amp_sampling_z(sz, pp,sampling)
+function check_amp_sampling_z(sz, pp, sampling)
     if length(sz) > 2 && sz[3]>1
         sample_factor = k_dz(pp) ./ ((sz[3] .÷2) .* k_scale(sz, pp, sampling)[3]) ./ 2
         if (sample_factor > 1.0)
             @warn "Your calculation is undersampled along Z by factors of $sample_factor. The PSF calculation will be incorrect.)"
         end
+    end
+end
+
+function get_amp_sampling_z(sz, pp, sampling)
+    if length(sz) > 2 && sz[3]>1
+        sample_factor = k_dz(pp) ./ ((sz[3] .÷2) .* k_scale(sz, pp, sampling)[3]) ./ 2
+        return sampling[3] ./ sample_factor;
     end
 end
 
