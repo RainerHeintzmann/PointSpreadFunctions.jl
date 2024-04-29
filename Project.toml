@@ -1,7 +1,7 @@
 name = "PointSpreadFunctions"
 uuid = "e8810a93-244e-46c5-8da3-35c5dd956001"
 authors = ["Rainer Heintzmann (rheintzmann) <heintzmann@gmail.com>"]
-version = "0.3"
+version = "0.4"
 
 [deps]
 FFTW = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
