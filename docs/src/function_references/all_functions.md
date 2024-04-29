@@ -23,6 +23,32 @@ PointSpreadFunctions.get_propagator_gradient(prop_phase, scalar, xy_scale)
 PointSpreadFunctions.apply_propagators(pupil, z_planes, pp::PSFParams; sampling=nothing) 
 PointSpreadFunctions.get_zernike_pupil_phase(sz, pp, sampling) 
 PointSpreadFunctions.get_zernike_pupil(sz, pp, sampling) 
+PointSpreadFunctions.get_Nyquist_limit
+PointSpreadFunctions.xx_rfft
+PointSpreadFunctions.yy_rfft
+PointSpreadFunctions.rr_rfft
+PointSpreadFunctions.to_rfft_pos  
+PointSpreadFunctions.pinhole_AU_to_pix  
+PointSpreadFunctions.AU_per_pixel   
+PointSpreadFunctions.confocal_int
+PointSpreadFunctions.jinc_r_2d
+PointSpreadFunctions.normalize_amp_to_plane
+PointSpreadFunctions.modify_STED_exp
+PointSpreadFunctions.get_pupil_aperture
+PointSpreadFunctions.kz_mid_pos
+PointSpreadFunctions.disc_pinhole_ft
+PointSpreadFunctions.modify_ident
+PointSpreadFunctions.sinc_r_2d
+PointSpreadFunctions.pol_circ_quadrant
+PointSpreadFunctions.modify_STED_hyper
+PointSpreadFunctions.box_pinhole_ft
+PointSpreadFunctions.exp_ikx_rfft
+PointSpreadFunctions.limit_θ
+PointSpreadFunctions.size_sampling_to3d
+PointSpreadFunctions.calc_with_resampling
+PointSpreadFunctions.limit_theta
+PointSpreadFunctions.pol_circ_tophat
+PointSpreadFunctions.modify_square
 ```
 
 ## Polarization
