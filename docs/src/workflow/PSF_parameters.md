@@ -12,4 +12,3 @@ PointSpreadFunctions.PSFParams(my_λ=500, my_NA=1.2, my_n=1.33; pol=pol_scalar, 
 ```@docs
 PointSpreadFunctions.Aberrations
 ```
-
