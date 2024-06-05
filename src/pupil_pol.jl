@@ -92,10 +92,12 @@ end
 assumes radial polarization in (illumination/detection) of at the pupil.
 
 Example:
-```julia
-    pp_em = PSFParams(0.532, 1.3, 1.52; mode=ModeWidefield, pol=pol_radial);
-    h_p = apsf(MethodPropagate, sz, pp_em, sampling=samp);
-    @vv real.(h_p[:,:,1,3])
+
+```julia-repl
+julia> using PointSpreadFunctions, View5D
+julia> pp_em = PSFParams(0.532, 1.3, 1.52; mode=ModeWidefield, pol=pol_radial);
+julia> h_p = apsf(MethodPropagate, sz, pp_em, sampling=samp);
+julia> @vv real.(h_p[:,:,1,3])
 ``
 """
 function pol_radial(T, xypos) # e.g. for STED microscopy
