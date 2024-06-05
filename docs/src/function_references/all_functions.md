@@ -37,7 +37,7 @@ PointSpreadFunctions.get_pupil_aperture
 
 ## Polarization
 
-These functions can be conveniently supplied to `PSFParams()` via the named argument `polarization` 
+These functions can be conveniently supplied to `PSFParams()` via the named argument `polarization`.
 ```@docs
 pol_scalar
 pol_scalar_spiral
@@ -47,6 +47,10 @@ pol_circ
 pol_circ_spiral
 pol_circ_tophat
 pol_circ_quadrant
+pol_radial
+pupil_annulus
+pupil_apodize_hann
+pupil_apodize_cos
 ```
 
 ## Aplanatic factors

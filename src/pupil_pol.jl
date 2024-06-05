@@ -1,4 +1,5 @@
-export pol_scalar, pol_scalar_spiral, pol_x, pol_y, pol_circ, pol_circ_spiral, pol_circ_tophat, pol_circ_quadrant
+export pol_scalar, pol_scalar_spiral, pol_x, pol_y, pol_circ, pol_circ_spiral, pol_circ_tophat, pol_circ_quadrant, pol_radial,  pol_radial_annulus
+export pupil_apodize_hann, pupil_apodize_cos, pupil_annulus
 # define a bunch of standard pupil polarizations
 
 """
@@ -85,4 +86,71 @@ end
 
 
 
+"""
+    pol_radial(T, xypos)
+
+assumes radial polarization in (illumination/detection) of at the pupil.
+
+Example:
+```julia
+    pp_em = PSFParams(0.532, 1.3, 1.52; mode=ModeWidefield, pol=pol_radial);
+    h_p = apsf(MethodPropagate, sz, pp_em, sampling=samp);
+    @vv real.(h_p[:,:,1,3])
+``
+"""
+function pol_radial(T, xypos) # e.g. for STED microscopy
+    xypos = T.(xypos)
+    xypos ./ sqrt.(1e-10+abs2(xypos[1])+abs2(xypos[2]))
+end
+
+# """
+#     combine_pupils(T, xypos; fct1, fct2)
+
+# combines two pupil functions fct1 and fct2 by multiplication. 
+# """
+# function combine_pupils(fct1, fct2)
+#     return (T, xypos) -> fct1(T, xypos) .* fct2(T, xypos)
+# end
+
+"""
+    pupil_annulus(T, xypos; r0= 0.8, σ=0.05) 
+
+returns a pupil function with an annulus at relative pupil radius r0 of exponential apodization width σ.
+Note that this pupil function should not be used by itself, but needs to be combined with a polarization function.
+"""
+function pupil_annulus(T, xypos; r0= 0.8, σ=0.05) # e.g. for STED microscopy
+    xypos = T.(xypos)
+    exp(-abs2(sqrt(abs2(xypos[1])+abs2(xypos[2]))-r0)/(2*abs2(σ))) 
+end
+    
+"""
+    pupil_apodize_hann(T, xypos; r0= 0.9) # 
+
+returns a pupil function with a hanning-type apodization starting at radius r0, extending to the pupil limit.
+Both, cos-window and Hann window apodization should yield a finite standard deviation of the PSF.
+Note that this pupil function should not be used by itself, but needs to be combined with a polarization function.
+"""
+function pupil_apodize_hann(T, xypos; r0= 0.9) # e.g. for STED microscopy
+    xypos = T.(xypos)
+    r = max(0, sqrt(abs2(xypos[1])+abs2(xypos[2]))-r0)/(1-r0)
+    return (1+cos(pi*r))/2
+end
+    
+"""
+    pupil_apodize_cosann(T, xypos; r0= 0.9) # 
+
+returns a pupil function with a cos-type apodization starting at radius r0, extending to the pupil limit.
+The cos-type apodization reaches zero at the border of the pupil, but with a slope.
+This cos-filter goes back to Gabor. Both, cos-window and Hann window apodization should yield a finite standard deviation of the PSF.
+Note that this pupil function should not be used by itself, but needs to be combined with a polarization function.
+"""
+function pupil_apodize_cos(T, xypos; r0= 0.9) # e.g. for STED microscopy
+    xypos = T.(xypos)
+    r = max(0, sqrt(abs2(xypos[1])+abs2(xypos[2]))-r0)/(1-r0)
+    return cos(pi*r/2)
+end
+
+function pol_radial_annulus(T, xypos; r0= 0.8, σ=0.05) # e.g. for STED microscopy
+    return pol_radial(T, xypos) .* pupil_annulus(T, xypos; r0=r0, σ=σ)
+end
 
