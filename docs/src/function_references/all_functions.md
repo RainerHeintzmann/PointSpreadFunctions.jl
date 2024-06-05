@@ -48,6 +48,7 @@ pol_circ_spiral
 pol_circ_tophat
 pol_circ_quadrant
 pol_radial
+pol_radial_annulus
 pupil_annulus
 pupil_apodize_hann
 pupil_apodize_cos

@@ -93,12 +93,12 @@ assumes radial polarization in (illumination/detection) of at the pupil.
 
 Example:
 
-```julia-repl
+```jdoctest
 julia> using PointSpreadFunctions, View5D
 julia> pp_em = PSFParams(0.532, 1.3, 1.52; mode=ModeWidefield, pol=pol_radial);
 julia> h_p = apsf(MethodPropagate, sz, pp_em, sampling=samp);
 julia> @vv real.(h_p[:,:,1,3])
-``
+```
 """
 function pol_radial(T, xypos) # e.g. for STED microscopy
     xypos = T.(xypos)
@@ -139,7 +139,7 @@ function pupil_apodize_hann(T, xypos; r0= 0.9) # e.g. for STED microscopy
 end
     
 """
-    pupil_apodize_cosann(T, xypos; r0= 0.9) # 
+    pupil_apodize_cos(T, xypos; r0= 0.9) # 
 
 returns a pupil function with a cos-type apodization starting at radius r0, extending to the pupil limit.
 The cos-type apodization reaches zero at the border of the pupil, but with a slope.
@@ -152,6 +152,11 @@ function pupil_apodize_cos(T, xypos; r0= 0.9) # e.g. for STED microscopy
     return cos(pi*r/2)
 end
 
+"""
+    pol_radial_annulus(T, xypos; r0= 0.8, σ=0.05) # e.g. for STED microscopy
+
+returns a pupil function with radial polarization and an annulus at relative pupil radius r0 of exponential apodization width σ.
+"""
 function pol_radial_annulus(T, xypos; r0= 0.8, σ=0.05) # e.g. for STED microscopy
     return pol_radial(T, xypos) .* pupil_annulus(T, xypos; r0=r0, σ=σ)
 end
