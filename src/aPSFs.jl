@@ -10,6 +10,43 @@ function apsf(::Type{MethodParaxial}, sz::NTuple, pp::PSFParams; sampling=nothin
     res
 end
 
+function apsf(::Type{MethodCZT}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
+    scale = (1.7, 2.0, 1.0, 1.0) # A tuple of factors (one for each dimension) to zoom into during the czt.
+   #It is a four dimensional factor, the first and second dimension represent x and y pixel.
+   #c_xy = (c_x, c_y, fixed factor, fixed factor) fixed factor == 1 
+
+   if isnothing(sampling)
+       sampling = get_Ewald_sampling(sz, pp)
+       print("Sampling is $sampling \n")
+   end
+
+   sz, sampling = size_sampling_to3d(sz, sampling)
+   check_amp_sampling(sz, pp, sampling)
+   pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) 
+
+   szz = (length(sz)>2) ? sz[3] : 1
+
+   if center_kz
+       _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling) # Ensure the broadcasted operation matches the dimensions of the pupil
+        # Create a zz array that matches the third dimension of the pupil but retains a singleton dimension for broadcasting compatibility
+        zz_array = zz((1, 1, size(pupil, 3))) 
+        phase_shift = cispi.((-2 * rel_kz / szz) .* zz_array)# centers the McCutchen pupil to be able to correctly resample it along kz
+        # Explicitly reshape phase_shift to match the 4D shape of pupil if necessary
+        phase_shift_reshaped = reshape(phase_shift, 1, 1, length(phase_shift), 1)
+        pupil .*= phase_shift_reshaped 
+   end
+
+   if !isnothing(pp.FFTPlan)
+       Pm2d = czt(pupil, scale, (1,2))  # scale: a tuple of factors (one for each dimension) to zoom into during the czt. 
+   end
+
+   res = iczt(pupil, scale, (1,2))  # Assuming default scale for simplicity. This should really be a zoomed iFFT.
+    # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
+
+    return normalize_amp_to_plane(res) # extract the central bit, which avoids the wrap-around effects.
+end
+
+
 function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
     sz = (length(sz)>2) ? sz : (sz[1:2]..., 1) # to also work for 2D input sizes
     check_amp_sampling(sz, pp, sampling)
