@@ -25,6 +25,7 @@ function compare_asfs(sz, pp, sampling; noRW=false)
     @test ctr_test(a_iter, a_prop2, 0.1)
     if (noRW) return end
     @time a_RW = apsf(PointSpreadFunctions.MethodRichardsWolf, sz, pp, sampling=sampling);
+    @time a_czt = apsf(PointSpreadFunctions.MethodCZT, sz ,pp, sampling=sampling);
     @test ctr_test(a_iter, a_RW, 0.1)
     # @vt a_prop2 a_iter a_sincR  a_prop a_shell a_RW
     # mz = size(a_prop2,3)÷2+1; @vt ft2d(a_prop2[:,:,mz:mz,:]) ft2d(a_iter[:,:,mz:mz,:]) ft2d(a_sincR[:,:,mz:mz,:]) ft2d(a_prop[:,:,mz:mz,:]) ft2d(a_shell[:,:,mz:mz,:]) ft2d(a_RW[:,:,mz:mz,:])
@@ -146,6 +147,8 @@ end
 @testset "2D vs. 3D" begin
     sampling = (0.04,0.04)
     sz = (128,128)
+    pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodCZT, pol=pol_x);
+    @test psf(sz, pp; sampling=sampling) == psf((sz...,1),pp; sampling=(sampling...,1))[:,:,1]
     pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodRichardsWolf, pol=pol_x);
     @test psf(sz, pp; sampling=sampling) == psf((sz...,1),pp; sampling=(sampling...,1))[:,:,1]
     pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodPropagateIterative, pol=pol_x);

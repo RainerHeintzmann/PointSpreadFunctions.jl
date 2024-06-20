@@ -11,38 +11,48 @@ function apsf(::Type{MethodParaxial}, sz::NTuple, pp::PSFParams; sampling=nothin
 end
 
 function apsf(::Type{MethodCZT}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
-    scale = (1.7, 2.0, 1.0, 1.0) # A tuple of factors (one for each dimension) to zoom into during the czt.
-   #It is a four dimensional factor, the first and second dimension represent x and y pixel.
-   #c_xy = (c_x, c_y, fixed factor, fixed factor) fixed factor == 1 
+    if isnothing(sampling)
+        sampling = get_Ewald_sampling(sz, pp)
+        print("Sampling is $sampling \n")
+    end
 
-   if isnothing(sampling)
-       sampling = get_Ewald_sampling(sz, pp)
-       print("Sampling is $sampling \n")
-   end
+    sz, sampling = size_sampling_to3d(sz, sampling)
+    check_amp_sampling(sz, pp, sampling)
+    wz = sz # window size N_xy: the number of pixels in the xy-focal plane
+    # calculate the zoom-in factor c and the desired window size N'_xy.
+    c = 1.2
+    c_xy = (c, c)
+    # wzn = 2 .* (wz ./2 + D_xy)  new window size N'_xy, the extension of this beam is therefore given by D.
+    wzn = wz .* c# a zoom-in factor c is calculated such that the pupil fits perfectly near the edge of the lateral window size.
+    
+    # Check the upper bound of D_xy so that the z depth is a very small distance. Normally the pixelpitch is in the range of 5 to 20 µm.
+    #If the zoom factor is too large, print the current zoom-in zDepth Δz separately along the x and y values to determine if it is too large.
+    D = tuple((wzn[i] - wz[i] for i in 1:2)...)
+    # D = atan(α) * zDepth, if D_xy >> grid size of pixelpitch, fourier wrap-around artefact cannot be avoid.
+    α = asin(pp.NA / pp.n); # maximal aperture angle
+    zDepth = D ./tan(α) # Δz_x = D_x / tan(α), Δz_y = D_y / tan(α)
 
-   sz, sampling = size_sampling_to3d(sz, sampling)
-   check_amp_sampling(sz, pp, sampling)
-   pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) 
+    if  any((x -> x < 1 || x >= 2).(c_xy))
+        println("Error: Zoom factor c less than 1 or larger than 2")
+        return "Function terminated due to error factor input."
+    end
+    #println("Zoom factor c = $c, z-depth = $(zDepth[1])")
 
-   szz = (length(sz)>2) ? sz[3] : 1
-
-   if center_kz
-       _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling) # Ensure the broadcasted operation matches the dimensions of the pupil
-        # Create a zz array that matches the third dimension of the pupil but retains a singleton dimension for broadcasting compatibility
-        zz_array = zz((1, 1, size(pupil, 3))) 
-        phase_shift = cispi.((-2 * rel_kz / szz) .* zz_array)# centers the McCutchen pupil to be able to correctly resample it along kz
-        # Explicitly reshape phase_shift to match the 4D shape of pupil if necessary
+    szn = sz .* c # new pixel pitch
+    #the puple has to be sampled different parameters, so that it fills the availabe number of pixels.
+    pupil = pupil_xyz(szn, pp, sampling) # field_xyz(resample_sz,pp, sampling) .* aplanatic_factor(resample_sz,pp,sampling) .* ft(jinc_r_2d(resample_sz[1:2],pp, sampling=sampling) .* my_disc(resample_sz[1:2],pp)) 
+    
+    szz = (length(szn)>2) ? Int(ceil(szn[3])) : 1
+    if center_kz
+        _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling) # ensure the broadcasted operation matches the dimensions of the pupil
+        phase_shift = cispi.((-2 * rel_kz / szz) .* zz((1, 1, size(pupil, 3))) )# centers the McCutchen pupil to be able to correctly resample it along kz
+        # explicitly reshape phase_shift to match the 4D shape of pupil if necessary
         phase_shift_reshaped = reshape(phase_shift, 1, 1, length(phase_shift), 1)
         pupil .*= phase_shift_reshaped 
-   end
+     end
 
-   if !isnothing(pp.FFTPlan)
-       Pm2d = czt(pupil, scale, (1,2))  # scale: a tuple of factors (one for each dimension) to zoom into during the czt. 
-   end
-
-   res = iczt(pupil, scale, (1,2))  # Assuming default scale for simplicity. This should really be a zoomed iFFT.
-    # ToDo: this normalization can probably be avoided if the pupil is normalized correctly.
-
+    c_4dim = (c_xy..., 1, 1)
+    res = iczt(pupil, c_4dim, (1,2))  
     return normalize_amp_to_plane(res) # extract the central bit, which avoids the wrap-around effects.
 end
 

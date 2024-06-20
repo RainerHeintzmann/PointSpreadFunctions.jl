@@ -182,8 +182,13 @@ See also:
 function jinc_r_2d(sz::NTuple, pp::PSFParams; sampling=nothing)
     if isnothing(sampling)
         sampling=get_Ewald_sampling(sz, pp)
+    end
+    if all(x -> isa(x, Integer), sz) #consider pupil resampling when window zoom in 
+        jinc.(rr(pp.dtype, sz[1:2], scale=2 .*sampling[1:2] ./ (pp.λ./pp.NA)))
+    else
+        nsz = map(x -> Int(ceil(x)), sz) # new size of the real-space array and pupil resampling
+        jinc.(rr(pp.dtype, nsz[1:2], scale=2 .*sampling[1:2] ./ (pp.λ./pp.NA)))
     end 
-    jinc.(rr(pp.dtype, sz[1:2], scale=2 .*sampling[1:2] ./ (pp.λ./pp.NA)))
 end
 
 """
@@ -411,7 +416,13 @@ end
 returns an array of radial k coordinates, |k_xy|
 """
 function k_r(sz, pp::PSFParams, sampling)
-    min.(k_0(pp), rr(pp.dtype, sz[1:2], scale = k_scale(sz[1:2], pp, sampling[1:2])))
+    #consider pupil resampling when window zoom in 
+    if all(x -> isa(x, Integer), sz)
+        min.(k_0(pp), rr(pp.dtype, sz[1:2], scale = k_scale(sz[1:2], pp, sampling[1:2])))
+    else
+        nsz = map(x -> Int(ceil(x)), sz) # new size of the real-space array and pupil resampling
+        min.(k_0(pp), rr(pp.dtype, nsz[1:2], scale = k_scale(nsz[1:2], pp, sampling[1:2]))) # return an array of relative radial distance to the extended pupil border.  
+    end  
 end
 
 """
@@ -429,7 +440,13 @@ end
 returns an array of relative distance to the pupil border
 """
 function k_xy_rel_pupil(sz,pp,sampling)
-    idx(pp.dtype, sz[1:2],scale = k_scale(sz[1:2], pp, sampling[1:2]) ./ k_pupil(pp))
+    # consider pupil resampling when window zoom in 
+    if all(x -> isa(x, Integer), sz)
+        idx(pp.dtype, sz[1:2],scale = k_scale(sz[1:2], pp, sampling[1:2]) ./ k_pupil(pp))
+    else
+        nsz = map(x -> Int(ceil(x)), sz) # new size of the real-space array and pupil resampling
+        idx(pp.dtype, nsz[1:2],scale = k_scale(nsz[1:2], pp, sampling[1:2]) ./ k_pupil(pp)) # return an array of relative distance to the extended pupil border.
+    end
 end
 
 """
