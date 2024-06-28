@@ -20,7 +20,7 @@ QuadGK = "2"
 FourierTools = "0.4"
 SpecialFunctions = "1, 2"
 ZernikePolynomials = "0.1"
-julia = "1, 1.6, 1.7, 1.8"
+julia = "1, 1.6, 1.7, 1.8, 1.9, 1.10"
 
 [extras]
 NDTools = "98581153-e998-4eef-8d0d-5ec2c052313d"
