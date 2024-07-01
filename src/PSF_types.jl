@@ -170,7 +170,9 @@ Arguments:
     + MethodRichardsWolf: Uses the method described in the paper by B. Richards and E. Wolf, "Electromagnetic diffraction in optical systems. II. structure of the image field in an aplanatic system," Proc. R. Soc. London A, vol. 253, no. 1274, 1959.
                             The terms I0, I1 and I2 are first calculated for an radial Z-dependet profile and then interpolated onto the 3D volume.
     + MethodCZT: Angulare spectrum propagation. Using the CZT to avoid or reduce wrap-around effect of FFT. The method involves the pupil fully covering the range and CZT zooming in. Set a flexible plan zoom factor C_xy >1  in the function
-
+        + zDepth: Z-Position from the focus to propagate to. If calcualte 3D apsf (sz[3] is larger than one), a stack is generated with zDepth being the position of the middle (floor.(size/2)) slice.
+        + c_want: plane zoom factor only vary by λ, NA, sampling. c_allow = λ/(NA*sampling)
+        + ZoomedPupil: Input the lateral size of zoom pupil. Expand the window size will change the pupils to resample the parameters and zoom depth affects ZoomedPupil resampling.
 + aplanatic:    aplanatic factor. Provided as a function of angle θ. Choices are `aplanatic_const`, `aplanatic_detection`, `aplanatic_illumination`, `aplanatic_illumination_flux`
 + FFTPlan:      information on how to calculate the FFTW plan. Default: nothing (using FFTW.ESTIMATE)
 + transition_dipole  If supplied a transition-dipole (e.g. sqrt(2) .* (0.0,1.0,1.0)) will be accounted for in the PSF calculation. If not normalized, the strength will be included.
