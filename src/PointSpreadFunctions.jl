@@ -8,7 +8,7 @@ export kz_mid_pos
 export modify_STED_exp, modify_STED_hyper, modify_ident, modify_square
 
 export ModeWidefield, ModeConfocal, Mode4Pi, ModeISM, Mode2Photon, ModeSTED, ModeLightsheet
-export MethodRichardsWolf, MethodPropagate, MethodPropagateIterative, MethodShell, MethodSincR
+export MethodRichardsWolf, MethodPropagate, MethodPropagateIterative, MethodShell, MethodSincR, MethodCZT
 
 include("aplanatic.jl")
 include("PSF_types.jl")
