@@ -27,7 +27,7 @@ function compare_asfs(sz, pp, sampling; noRW=false)
     if (noRW) return end
     @time a_RW = apsf(PointSpreadFunctions.MethodRichardsWolf, sz, pp, sampling=sampling);
     @test ctr_test(a_iter, a_RW, 0.1)
-    #@test ctr_test(a_czt, a_RW, 0.1)   
+    @test ctr_test(a_czt, a_RW, 0.1)   
     # @vt a_prop2 a_iter a_sincR  a_prop a_shell a_RW
     # mz = size(a_prop2,3)÷2+1; @vt ft2d(a_prop2[:,:,mz:mz,:]) ft2d(a_iter[:,:,mz:mz,:]) ft2d(a_sincR[:,:,mz:mz,:]) ft2d(a_prop[:,:,mz:mz,:]) ft2d(a_shell[:,:,mz:mz,:]) ft2d(a_RW[:,:,mz:mz,:])
     # mz = size(a_prop2,3)÷2+1; @vt ft2d(a_prop2) ft2d(a_iter) ft2d(a_sincR) ft2d(a_prop) ft2d(a_shell) ft2d(a_RW)
