@@ -8,7 +8,7 @@ csz = (32,32,32)
 sampling=(0.100,0.100,0.150)
 
 function ctr_test(dat1, dat2, rtol=0.01)
-    isapprox(select_region(dat1,new_size=csz), select_region(dat2,new_size=csz), rtol=rtol)
+    isapprox(select_region(dat1, new_size=csz), select_region(dat2, new_size=csz), rtol=rtol)
 end
 
 function compare_asfs(sz, pp, sampling; noRW=false)
@@ -156,7 +156,11 @@ end
     @test psf(sz, pp; sampling=sampling) == psf((sz...,1),pp; sampling=(sampling...,eps(eltype(sampling))))[:,:,1]
     pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodPropagate, pol=pol_x);
     @test psf(sz, pp; sampling=sampling) == psf((sz...,1),pp; sampling=(sampling...,eps(eltype(sampling))))[:,:,1]
-    pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodSincR, pol=pol_x);
+    # SincR is not supposed to work in 2D
+    # pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodSincR, pol=pol_x);
+    # @test psf(sz, pp; sampling=sampling) == psf((sz...,1),pp; sampling=(sampling...,eps(eltype(sampling))))[:,:,1]
+    pp = PSFParams(0.5,1.3,1.52; mode=ModeWidefield, method=PointSpreadFunctions.MethodCZT, pol=pol_x);
+    @test psf(sz, pp; sampling=sampling) == psf((sz...,1),pp; sampling=(sampling...,eps(eltype(sampling))))[:,:,1]
 
     pp = PSFParams(0.5,1.3,1.52; mode=ModeConfocal, pol=pol_x);
     @test psf(sz, pp; pp_ex=pp, pinhole=1.0, sampling=sampling) == psf((sz...,1),pp; pp_ex=pp, pinhole=1.0, sampling=(sampling...,1))[:,:,1]

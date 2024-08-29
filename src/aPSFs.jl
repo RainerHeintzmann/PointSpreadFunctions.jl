@@ -13,11 +13,11 @@ end
 
 """
     apsf(::Type{MethodCZT}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
-    Calculate amplitude PSF using Chrip-Z transform. the PSF at a given zDepth requires a bigger window to avoid or reduce wrap-around effect of FFT operation.
-    Firstly given an input parameter zDepth to calculate the xy_plane zoom factor c then apply on the pupil based on the desired depth. Calculate the inverse CZT of the 
+    Calculate amplitude PSF using Chrip-Z transform. the PSF at a given z_depth requires a bigger window to avoid or reduce wrap-around effect of FFT operation.
+    Firstly given an input parameter z_depth to calculate the xy_plane zoom factor c then apply on the pupil based on the desired depth. Calculate the inverse CZT of the 
     field at pupil and zoom-out by the factor c.
-    + zDepth: Z-Position from the focus to propagate to. If calcualte 3D apsf (sz[3] is larger than one), a stack is generated with zDepth being the position of the middle (floor.(size/2)) slice.
-    + c_want: plane zoom factor only vary by λ, NA, sampling and zDepth. c_allow = λ/(NA*sampling)
+    + z_depth: Z-Position from the focus to propagate to. If calcualte 3D apsf (sz[3] is larger than one), a stack is generated with z_depth being the position of the middle (floor.(size/2)) slice.
+    + c_want: plane zoom factor only vary by λ, NA, sampling and z_depth. c_allow = λ/(NA*sampling)
 """
 function apsf(::Type{MethodCZT}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
     if isnothing(sampling)
@@ -29,22 +29,55 @@ function apsf(::Type{MethodCZT}, sz::NTuple, pp::PSFParams; sampling=nothing, ce
     check_amp_sampling(sz, pp, sampling)
 
     wz= sz[1:2] # the window size N_xy.    
-    zDepth = 0
+    z_depth = 0
 
     z_planes = (length(sz)>2) ? sz[3] : 1
-    sz = (wz...,z_planes,3) # initialize a new 4D array of xyz complex numbers and signalton. 
+    se = ifelse(pp.polarization == pol_scalar, 1, 3)
+    sz = (wz..., z_planes, se) # initialize a new 4D array of xyz complex numbers and signalton. 
     pupils = Array{Complex{pp.dtype}}(undef, sz)
 
-    MidPoint= z_planes ÷2 + 1 
-    for n in 1:sz[3] 
-        MyDist= n-MidPoint + zDepth/sampling[3] 
-        SliceP = ZoomedPupilProp(sz, pp; sampling, MyDist, center_kz=false) 
-        pupils[:,:,n:n,:] = SliceP 
+    mid_point= z_planes ÷2 + 1 
+    zoomed_pupil_fwd = Array{Complex{pp.dtype}}(undef, (1,1));
+    zoomed_pupil_bwd = Array{Complex{pp.dtype}}(undef, (1,1));
+    propagator = Array{Complex{pp.dtype}}(undef, (1,1));
+    # for n in 1:sz[3] 
+    #     my_dist = n - mid_point + z_depth / sampling[3] 
+    #     SliceP, zoomed_pupil = zoomed_pupilProp(sz, pp, zoomed_pupil; sampling, my_dist, center_kz=false) 
+    #     pupils[:,:,n:n,:] = SliceP 
+    # end
+    m=0
+    for n in mid_point:-1:1
+        my_dist = n - mid_point + z_depth / sampling[3] 
+        m = mid_point + (mid_point - n)
+        if (m <= size(pupils, 3))
+            if (n == mid_point)
+                pupils[:,:,m:m,:], _, zoomed_pupil_fwd, zoomed_pupil_bwd, propagator = zoomed_pupilProp(sz, pp, zoomed_pupil_fwd, zoomed_pupil_bwd, propagator, sampling, my_dist; center_kz=false) 
+            else
+                pupils[:,:,m:m,:], pupils[:,:,n:n,:], zoomed_pupil_fwd, zoomed_pupil_bwd, propagator = zoomed_pupilProp(sz, pp, zoomed_pupil_fwd, zoomed_pupil_bwd, propagator, sampling, my_dist; center_kz=false) 
+            end
+        else
+            _, pupils[:,:,n:n,:], zoomed_pupil_fwd, zoomed_pupil_bwd, propagator = zoomed_pupilProp(sz, pp, zoomed_pupil_fwd, zoomed_pupil_bwd, propagator, sampling, my_dist; center_kz=false) 
+        end
     end
     return normalize_amp_to_plane(pupils) 
 end
 
-function ZoomedPupilProp(sz, pp::PSFParams;  sampling, MyDist,  center_kz=false)
+
+"""
+    calculate_CZT_target_size(sz, pp::PSFParams, zoom_factor)
+
+Calculate the target size for the CZT method. The target size is calculated based on
+the size of the pupil function in the xy-plane and the desired z-depth. A factor (zoom_factor) determines
+how much the pupil function is zoomed in or out in each step.
+
++ `sz`: the size of the pupil function in the xy-plane.
++ `pp`: the PSFParams object containing the parameters of the PSF.
++ `sampling`: the real-space sampling of the PSF.
++ `zoom_factor`: the factor by which the pupil function is zoomed in or out compared to the central slice. This does not depend on the propagation distance
+
+returned is the target size of the pupil function (`tsz`) and the Float64 zoom factor (`c_want`) to apply for the CZT.
+"""
+function calculate_CZT_target_size(sz, pp::PSFParams, sampling, my_dist, zoom_factor = 1.3)
     wz = sz[1:2] # original size N_xy: the number of pixels in the xy-focal plane where the pupil fully covers the range and CZT zooms in.
     # calculate the zoom factor c and the desired window size N'_xy.
     hwz = floor.(wz./2) # half image size
@@ -52,56 +85,87 @@ function ZoomedPupilProp(sz, pp::PSFParams;  sampling, MyDist,  center_kz=false)
     c_allow  = hwz ./ PupilRadius  # allowedZoomFactor = HalfImgSize ./ PupilRadius 
 
     lambda = pp.λ /pp.n # emission wavelength in the immersion medium in real condition
-    # calcualted with parameter zDepth as a heiristic margin to avoid wrap-around. 
+    # calcualted with parameter z_depth as a heiristic margin to avoid wrap-around. 
     k_xymax = pp.NA / pp.λ # pupil radius in reciprocal space units. 
     kz = sqrt(1/(lambda*lambda)-k_xymax*k_xymax) # calculate kz in reciprocal space units.   
     tan_α = k_xymax / kz
-    wzn = 2 .* (hwz .+ tan_α * abs(MyDist*sampling[3]) ./ sampling[1:2]) # D = tan(α) * zDepth, wzn = 2 .* (wz ./2 .+ D)  new window size N'_xy, the extension of this beam is therefore given by D.
-    c_want = wzn./ wz .* 1.3
+    wzn = 2 .* (hwz .+ tan_α * abs(my_dist*sampling[3]) ./ sampling[1:2]) # D = tan(α) * z_depth, wzn = 2 .* (wz ./2 .+ D)  new window size N'_xy, the extension of this beam is therefore given by D.
+    c_want = wzn./ wz .* zoom_factor
     c_want = ifelse.(c_want .< c_allow, c_allow, c_want) # get the zoom "for free", zoom in as much as possible. 
     c_want = floor.(c_want) # round the wanted zoom factor.
     
     if any(c_allow .- c_want .> 0)
         tsz = wz # target size is the new size in pixels need to calculate.
     else
-        tsz = ceil.(2.0 .* c_want .* PupilRadius ) # calculate the new target size such that the pupil just about fits inside
-        tsz = tsz .+ mod.(tsz, 2) # force to be even, due to a problem of czt for uneven sizes.
+        tsz = ceil.(Int, 2 .* c_want .* PupilRadius) # calculate the new target size such that the pupil just about fits inside
+        tsz = tsz .+ (tsz .÷2) # force to be even, due to a problem of czt for uneven sizes.
     end  
 
     PupilRadiusPro = tsz .* (pp.NA / pp.λ) .* sampling[1:2] 
     # the puple has to be sampled different parameters, so that it fills the availabe number of pixels.
     c_want  = floor.(floor.(tsz./ 2.0) ./ PupilRadiusPro) # wantedZoomFactor = New_HalfImgSize ./ PupilRadiusPro;
-    c_apply = c_want
+    return tsz, c_want
+end
 
+"""
+    zoomed_pupilProp(sz, pp::PSFParams, zoomed_pupil_fwd, zoomed_pupil_bwd, propagator,  sampling, my_dist,  center_kz=false)
 
-    ZoomedSampling = sampling .* (c_apply...,1) # broadcast
-    ZoomedSz = Int.((tsz...,1)) # because idx(tsz, size::NTuple{N, Int}) 
-    # compute the zoomed pupil function.
-    ZoomedPupil =  pupil_xyz(ZoomedSz, pp, ZoomedSampling) # ZoomedPupil =  field_xyz(Zoomedsz, pp, ZoomedSampling) .* aplanatic_factor(Zoomedsz, pp, ZoomedSampling) .* ft(jinc_r_2d(Zoomedsz, pp, sampling=ZoomedSampling))
-    
-    szz =  length(sz)>2  ? sz[3] : 1
+Calculate the forward and backward propagation of the pupil function for a given distance `my_dist` in the z-direction.
 
-    if center_kz
-        _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling)
-        ZoomedPupil .*= cispi.((-2*rel_kz/szz) .* zz((1,1,szz))) # centers the McCutchen pupil to be able to correctly resample it along kz
++ `sz`: the size of the pupil function in the xy-plane.
++ `pp`: the PSFParams object containing the parameters of the PSF.
++ `zoomed_pupil_fwd`: the forward propagated pupil function.
++ `zoomed_pupil_bwd`: the backward propagated pupil function.
++ `propagator`: the propagator phase for the forward propagation.
++ `sampling`: the sampling of the pupil function.
++ `my_dist`: the distance to propagate the pupil function.
++ `center_kz`: whether to center the pupil function along the kz-axis.
+
+"""
+function zoomed_pupilProp(sz, pp::PSFParams, zoomed_pupil_fwd, zoomed_pupil_bwd, propagator, sampling, my_dist; center_kz=false)
+
+    tsz, c_apply = calculate_CZT_target_size(sz, pp, sampling, my_dist)
+
+    # re-compute the zoomed pupil function, only if a recalculation is needed. This is judged solely by the size of the pupil.
+    if isempty(zoomed_pupil_fwd) || (size(zoomed_pupil_fwd)[1:2] != tsz)
+        zoomed_sampling = sampling .* (c_apply...,1) # broadcast
+        zoomed_sz = Int.((tsz...,1)) # because idx(tsz, size::NTuple{N, Int}) 
+        zoomed_pupil = pupil_xyz(zoomed_sz, pp, zoomed_sampling) # zoomed_pupil =  field_xyz(Zoomedsz, pp, zoomed_sampling) .* aplanatic_factor(Zoomedsz, pp, zoomed_sampling) .* ft(jinc_r_2d(Zoomedsz, pp, sampling=zoomed_sampling))
+        szz =  length(sz)>2  ? sz[3] : 1
+        if center_kz
+            _, rel_kz = get_McCutchen_kz_center(sz,pp,sampling)
+            zoomed_pupil .*= cispi.((-2*rel_kz/szz) .* zz((1,1,szz))) # centers the McCutchen pupil to be able to correctly resample it along kz
+        end
+        wzn = size(zoomed_pupil)[1:2] # the new window size N'_xy.
+        # canvas = (wzn...,szz,size(zoomed_pupil)[4]) # initialize a new 4D array of xyz complex numbers and signalton.
+        
+        prop_phase, scalar, xy_scale = get_propagator(wzn , pp, zoomed_sampling) # retrieves the propagator phase, propagating a single Z-slice.
+        propagator = cis.(prop_phase) # calculated ar returned always for the forward direction
+        if (my_dist != 0)
+            zoomed_pupil_fwd = zoomed_pupil .* cis.(abs(my_dist).*prop_phase)
+            zoomed_pupil_bwd = zoomed_pupil .* cis.(-abs(my_dist).*prop_phase)
+        else
+            zoomed_pupil_fwd = zoomed_pupil
+            zoomed_pupil_bwd = zoomed_pupil
+        end
+    else
+        zoomed_pupil_fwd = zoomed_pupil_fwd .* propagator
+        zoomed_pupil_bwd = zoomed_pupil_bwd .* conj.(propagator)
     end
 
-    wzn = size(ZoomedPupil)[1:2] # the new window size N'_xy.
-    # canvas = (wzn...,szz,size(ZoomedPupil)[4]) # initialize a new 4D array of xyz complex numbers and signalton.
     c_4dim = (c_apply..., 1, 1)  # expand the scale size to fit scale argument of iczt(). 
-    
-    prop_phase, scalar, xy_scale = get_propagator(wzn , pp, ZoomedSampling) # retrieves the propagator phase, propagating a single Z-slice.
+    # 2D inverse CZT for each slice:
+    wz = sz[1:2] # original size N_xy: the number of pixels in the xy-focal plane where the pupil fully covers the range and CZT zooms in.
+    # has_z-symmetry does NOT work properly for vectorial situations.
+    if false # (has_z_symmetry(pp))
+        propagated_fwd = iczt(zoomed_pupil_fwd, c_4dim, 1:2, wz) 
+        propagated_bwd = conj.(propagated_fwd)
+    else
+        propagated_fwd = iczt(zoomed_pupil_fwd, c_4dim, 1:2, wz) 
+        propagated_bwd = iczt(zoomed_pupil_bwd, c_4dim, 1:2, wz) 
+    end
 
-    #k_max_rel = ZoomedSampling[1:2] ./ lambda 
-    #scalar = pp.dtype(2π*ZoomedSampling[3] / lambda) 
-    #xy_scale = 1 ./ (k_max_rel .* wzn[1:2]) 
-    #sqrt_term = phase_kz(pp.dtype, wzn[1:2], scale = xy_scale) 
-    #prop_phase = scalar .* sqrt_term  
-    
-    ZoomedPupil = ZoomedPupil .* cis.(MyDist.*prop_phase) 
-    propagated = iczt(ZoomedPupil, c_4dim) 
-    propagated = select_region(propagated, wz) 
-    return propagated
+    return propagated_fwd, propagated_bwd, zoomed_pupil_fwd, zoomed_pupil_bwd, propagator
 end  
 
 function apsf(::Type{MethodSincR}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
@@ -216,7 +280,7 @@ function apsf(::Type{MethodPropagate}, sz::NTuple, pp::PSFParams; sampling=nothi
 
     check_amp_sampling(sz, pp, sampling)
     # the pupil below is the ft of a jinc in real space and includes a factor of my_disc(sz[1:2],pp) to reduce wrap around
-    pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
+    pupil = pupil_xyz(sz, pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) 
     szz = (length(sz)>2) ? sz[3] : 1
     pupils = apply_propagators(pupil, szz, pp, sampling=sampling)
 
