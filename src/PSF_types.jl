@@ -14,6 +14,7 @@ struct MethodPropagateIterative<: PSFMethod end
 struct MethodRichardsWolf <: PSFMethod end
 struct MethodShell <: PSFMethod end
 struct MethodParaxial <: PSFMethod end
+struct MethodCZT <: PSFMethod end
 
 export Aberrations
 export Zernike_Piston, Zernike_Tilt, Zernike_Tip, Zernike_ObliqueAstigmatism, Zernike_Defocus, Zernike_VerticalAstigmatism, Zernike_VerticalTrefoil
