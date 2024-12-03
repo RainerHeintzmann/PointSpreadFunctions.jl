@@ -188,13 +188,13 @@ function psf(::Type{ModeLightsheet}, sz::NTuple, pp_em::PSFParams; sampling=noth
             if (ex_modifier == modify_square)
                 max_samp_ex = max_samp_ex./2;
             else
-                warn("unsupported excitation modifyer for the sampling calculation")
+                 @warn("unsupported excitation modifyer for the sampling calculation")
             end
         end
         max_samp_em = get_amp_sampling_z(sz, pp_em, sampling)
         max_samp_total = 1/(1/max_samp_ex[1] + 1/max_samp_em);
         if (sampling[3] > max_samp_total)
-            warn("The z-sampling of the lightsheet PSF is undersampled. The z-sampling should be at least $max_samp_total. The current z-sampling is $(sampling[3]).")
+                @warn("The z-sampling of the lightsheet PSF is undersampled. The z-sampling should be at least $max_samp_total. The current z-sampling is $(sampling[3]).")
         end
     end
 
