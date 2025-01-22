@@ -136,18 +136,18 @@ function get_propagator_gradient(prop_phase, scalar, xy_scale)
     return dx_prop_phase, dy_prop_phase
 end
 
-function get_Zernike_normcoeff(index_style, j)
-    n,m = let 
-        if index == :OSA
-            OSA2mn(j)
-        elseif index == :Noll
-            Noll2mn(j)
-        else
-            error("Unknown Zernike sequential index")
-        end
-    end
-    return normalization(n,m) # The normalization of the Zernike toolbox is according to Thibos et al. - "Standards for Reporting the Optical Aberrations of Eyes"
-end
+# function get_Zernike_normcoeff(index_style, j)
+#     n,m = let 
+#         if index_style == :OSA
+#             OSA2mn(j)
+#         elseif index_style == :Noll
+#             Noll2mn(j)
+#         else
+#             error("Unknown Zernike sequential index")
+#         end
+#     end
+#     return normalization(n,m) # The normalization of the Zernike toolbox is according to Thibos et al. - "Standards for Reporting the Optical Aberrations of Eyes"
+# end
 
 """
     get_zernike_pupil_phase(sz, pp, sampling) 
