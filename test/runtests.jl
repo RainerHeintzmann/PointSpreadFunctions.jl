@@ -47,6 +47,8 @@ end
 
     pp = PSFParams(pol=pol_radial)
     compare_asfs(sz, pp, sampling; noRW=true)
+    pp = PSFParams(pol=pol_azimuthal)
+    compare_asfs(sz, pp, sampling; noRW=true)
     pp = PSFParams(pol=pol_radial_annulus)
     compare_asfs(sz, pp, sampling; noRW=true)
     # pp = PSFParams(pol=(T, xy) -> pupil_annulus(T, xy) .* pol_radial(T, xy)) # already tested above

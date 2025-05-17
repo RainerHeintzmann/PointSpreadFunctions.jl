@@ -1,4 +1,4 @@
-export pol_scalar, pol_scalar_spiral, pol_x, pol_y, pol_circ, pol_circ_spiral, pol_circ_tophat, pol_circ_quadrant, pol_radial,  pol_radial_annulus
+export pol_scalar, pol_scalar_spiral, pol_x, pol_y, pol_circ, pol_azimuthal, pol_circ_spiral, pol_circ_tophat, pol_circ_quadrant, pol_radial,  pol_radial_annulus
 export pupil_apodize_hann, pupil_apodize_cos, pupil_annulus
 # define a bunch of standard pupil polarizations
 
@@ -104,6 +104,21 @@ function pol_radial(T, xypos) # e.g. for STED microscopy
     xypos = T.(xypos)
     xypos ./ sqrt.(1e-10+abs2(xypos[1])+abs2(xypos[2]))
 end
+
+"""
+    pol_azimuthal(T, relpos)
+
+calculates the Ux and Uy complex electric fields given a relative position in the pupil plane. Radius one corresponding the the pupil radius.
+Azimuthal polarization yields a doughnut-shaped intensity distribution in the focus.
+"""
+function pol_azimuthal(T, relpos)
+    # azimuthal polarization
+    # convert type
+    x, y = T.(relpos) 
+    θ = atan(y, x)
+    return (-sin(θ), cos(θ))
+end
+
 
 # """
 #     combine_pupils(T, xypos; fct1, fct2)
