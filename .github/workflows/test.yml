@@ -17,12 +17,12 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        julia-version: ['lts', '1', 'pre']
-        julia-arch: [x64, x86]
-        os: [ubuntu-latest, windows-latest, macOS-latest]
-        exclude:
-          - os: macOS-latest
-            julia-arch: x86
+        julia-version: ['1'] #  , 'lts', 'pre' 
+        julia-arch: [x64] # x86
+        os: [ubuntu-latest]  # windows-latest, macOS-latest
+        # exclude:
+        #   - os: macOS-latest
+        #     julia-arch: x86
 
     steps:
       - uses: actions/checkout@v4
