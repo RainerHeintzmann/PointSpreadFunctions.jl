@@ -297,13 +297,13 @@ end
 returns the pinhole in AU. Also checks if the pinhole is too big.
 """
 function pinhole_AU_to_pix(sz, pp_em, sampling, pinhole)
-     # now we need to modify the sampling such that the pinhole corrsponds to the equivalent of one Airy Unit.
+    # now we need to modify the sampling such that the pinhole corrsponds to the equivalent of one Airy Unit.
     # The Airy Unit is the diameter of the Airy disc: 1.22 * lamda_em / NA 
     # AU = 1.22 * pp_em.λ / pp_em.NA
     if isnothing(pinhole)
         return nothing
     end
-    if isinf(pinhole)
+    if any(isinf.(pinhole))
         return Inf
     end
     AU_pix = AU_per_pixel(pp_em, sampling) # AU ./ sampling[1:2]
