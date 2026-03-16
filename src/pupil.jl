@@ -49,7 +49,10 @@ end
 returns the pupil polarization as a 4D array with the XY polarization components stacked along the 4th dimension.
 """
 function field_pupil(sz, pp, sampling)
-    idx_to_dim(expand_dims(pp.polarization.(pp.dtype, k_xy_rel_pupil(sz,pp,sampling)),Val(3)))
+    tmp =expand_dims(pp.polarization.(pp.dtype, k_xy_rel_pupil(sz,pp,sampling)),Val(3))
+    # the "my" below may be removed when idx_to_dim strictly returns a one greater dimension than the input array.
+    # currently NDTools.jl Version 0.8.1, it drops a dimensions when the tuple is of length 1
+    my_idx_to_dim(tmp)
 end
 
 """

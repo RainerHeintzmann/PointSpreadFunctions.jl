@@ -1,4 +1,29 @@
 """
+    ensure_dims(arr, ndims)
+
+is like expand_dims but appends the dimensions at the front. It inserts dimensions at the front (innermost dimension) to ensure the
+total number of dimensions matches. 
+
+CAREFUL: THis is a local helper function which might be removed as soon as NDTools.jl supports properly preserving output dimensions.
+for idx_to_dim.
+"""
+function ensure_dims(arr::AbstractArray{T, N}, ::Val{N})::AbstractArray{T, N} where {T, N}
+    arr
+end
+
+function ensure_dims(arr::AbstractArray{T, N}, ::Val{M})::AbstractArray{T, M} where {T, N, M}
+    newsize = ntuple((d)-> (d<=M-N) ? 1 : size(arr, d-(M-N)), M)
+    reshape(arr, newsize)
+end
+
+## temporary type-stable version of NDTools.idx_to_dim to be used until NDTools.jl updates this.
+function my_idx_to_dim(idx_arr::AbstractArray{T, N})::AbstractArray{TT, N+1} where {TT, NT, T<:NTuple{NT, TT}, N} 
+    newdims = ntuple((d)->mod(d, N+1)+1, N+1)
+    return permutedims(ensure_dims(NDTools.idx_to_arr_view(idx_arr),Val(N+1)), newdims)
+end
+
+
+"""
     amp_to_int(field, pp) 
 
 converts a complex-valued amplitude field to intensity via `abs2.` and summing over the 4th dimension and dropping the 4th dimension.
