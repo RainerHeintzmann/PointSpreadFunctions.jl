@@ -101,6 +101,14 @@ function get_Nyquist_limit(pp::PSFParams)
     get_Abbe_limit(pp) ./ 2
 end
 
+# Border/oversampling correction factor shared by get_required_amp_sampling and
+# get_Ewald_sampling: (sz2-2)/sz2 for a real (more-than-one-pixel) dimension,
+# but that divides by zero for a singleton dimension (sz2==0, i.e. sz[i]<=1,
+# e.g. genuinely 2D data with a Z size of 1) — where "oversampling to avoid
+# border problems" doesn't apply anyway (there is no border to sample across
+# in that direction), so use no correction (factor 1) there instead.
+_border_factor(sz2i::Integer) = sz2i == 0 ? one(sz2i) : (sz2i - 2) / sz2i
+
 """
     get_required_amp_sampling(sz::NTuple, pp::PSFParams)
 
@@ -128,7 +136,7 @@ julia> PointSpreadFunctions.get_required_amp_sampling(sz,pp)
 function get_required_amp_sampling(sz::NTuple, pp::PSFParams)
     abbe = get_Abbe_limit(pp)[1:length(sz)]
     sz2 = sz .÷ 2
-    abbe .* (sz2.-2) ./ sz2 # provide a minimum amount of oversampling to avoid problems with the border pixesl.
+    abbe .* _border_factor.(sz2) # provide a minimum amount of oversampling to avoid problems with the border pixesl.
 end
 
 """
@@ -137,9 +145,9 @@ end
 returns the required minimum sampling for the calculation of a full Ewald sphere.
 """
 function get_Ewald_sampling(sz::NTuple, pp::PSFParams)
-    s_xyz = pp.λ ./ (2 .* pp.n) 
+    s_xyz = pp.λ ./ (2 .* pp.n)
     sz2 = sz .÷ 2
-    pp.dtype.(s_xyz .* (sz2.-2) ./ sz2) # provide a minimum amount of oversampling to avoid problems with the border pixesl.
+    pp.dtype.(s_xyz .* _border_factor.(sz2)) # provide a minimum amount of oversampling to avoid problems with the border pixesl.
 end
 
 
