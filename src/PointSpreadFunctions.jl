@@ -192,7 +192,12 @@ function psf(::Type{ModeLightsheet}, sz::NTuple, pp_em::PSFParams; sampling=noth
             end
         end
         max_samp_em = get_amp_sampling_z(sz, pp_em, sampling)
-        max_samp_total = 1/(1/max_samp_ex[1] + 1/max_samp_em);
+        # get_amp_sampling_z returns `nothing` for a single Z-plane (sz[3]<=1):
+        # with only one plane there is no per-plane Z-sampling constraint to
+        # combine in, so fall back to the excitation-only (XY-derived) bound
+        # instead of `1/nothing` (a genuinely 2D lightsheet PSF is otherwise
+        # a completely ordinary request).
+        max_samp_total = max_samp_em === nothing ? max_samp_ex[1] : 1/(1/max_samp_ex[1] + 1/max_samp_em);
         if (sampling[3] > max_samp_total)
                 @warn("The z-sampling of the lightsheet PSF is undersampled. The z-sampling should be at least $max_samp_total. The current z-sampling is $(sampling[3]).")
         end

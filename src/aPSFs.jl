@@ -306,6 +306,16 @@ function apply_propagator_iteratively(sz, pp::PSFParams; sampling, center_kz=fal
     start_z = z_planes÷2+1
     max_pix_travel = (tan(asin(pp.NA / pp.n)) * sampling[3]) ./ sampling[1:2] # how much does the maximal anlge travel geometrically
     PMLsz = (ceil.(Int, max_pix_travel .* 8)...,0) # To get the number of perfectly matched layer (PML) pixels to append
+    # This padding scales with the Z-to-XY sampling ratio: a grossly
+    # inconsistent sampling (mismatched units between XY and Z, or a
+    # placeholder value substituted somewhere for missing metadata — e.g. XY
+    # sampling in the low micrometers but Z left at a "1" default) inflates it
+    # arbitrarily, silently attempting to allocate a huge array (an apparent
+    # "Out of Memory" with no indication of the actual cause) instead of
+    # failing with a clear, actionable message.
+    if any(PMLsz[1:2] .> 1024)
+        error("PSF calculation aborted: the required propagation padding ($(PMLsz[1:2]) pixels beyond the requested size $(sz[1:2])) is implausibly large. This is usually caused by an inconsistent sampling/pixel size — e.g. the Z sampling ($(sampling[3])) differs from the XY sampling ($(sampling[1:2])) by many orders of magnitude, often due to mismatched units or a placeholder value substituted for missing metadata. Check the confirmed pixel size for this dataset.")
+    end
     psz = sz .+ 2 .*PMLsz # total size for propagation pupil
     pupil = pupil_xyz(psz[1:2], pp, sampling) # field_xyz(big_sz,pp, sampling) .* aplanatic_factor(big_sz,pp,sampling) .* ft(jinc_r_2d(big_sz[1:2],pp, sampling=sampling) .* my_disc(big_sz[1:2],pp)) # 
     sz = (sz[1:3]...,size(pupil)[4])
