@@ -460,7 +460,8 @@ The radial integrals are evaluated (via Simpson's rule with `N` intervals) on an
 Only the Fourier orders (and cos/sin parts), which are larger than `rel_tol` relative to the largest coefficient are calculated.
 The unaberrated version is much faster, see `apsf(MethodRichardsWolf, ...)`.
 
-This extension of the Richards & Wolf method follows the approach of the `universal_psf` package by J. Enderlein 
+This extension of the Richards & Wolf method follows the approach of the `universal_psf` package by 
+Gligonov et al. (Enderlein lab)
 (https://gitlab.gwdg.de/ag_enderlein/universal_psf/), which is described in the bioRxiv preprint
 "https://www.biorxiv.org/content/10.64898/2026.04.28.721333v1" (doi: 10.64898/2026.04.28.721333).
 """
@@ -568,7 +569,8 @@ Calculates the amplitude point spread function using the method of B. Richards a
 Proc. R. Soc. London A 253, 358 (1959). The terms I0, I1 and I2 are calculated on an RZ plane (assuming rotational symmetry) and are then interpolated onto the 3D volume.
 
 If Zernike aberrations are present in `pp.aberrations`, the rotational symmetry is broken and the calculation is delegated to `apsf_RW_aberrated`, which expands the aberrated pupil into azimuthal Fourier orders.
-This extension follows the approach of the `universal_psf` package by J. Enderlein (https://gitlab.gwdg.de/ag_enderlein/universal_psf/), which is described in the bioRxiv preprint
+This extension follows the approach of the `universal_psf` package by Gligonov et al. 
+(https://gitlab.gwdg.de/ag_enderlein/universal_psf/), which is described in the bioRxiv preprint
 https://www.biorxiv.org/content/10.64898/2026.04.28.721333v1 (doi: 10.64898/2026.04.28.721333). 
 Supported polarizations are `pol_x`, `pol_y`, `pol_circ` and `pol_scalar`.
 """
