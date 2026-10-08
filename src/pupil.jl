@@ -220,6 +220,23 @@ function get_zernike_pupil_phase(sz, pp, sampling)
 end
 
 """
+    get_zernike_phase_polar(pp, ρ, ψ)
+
+calculates the Zernike aberration phase (in radians, see `Aberrations`) defined in `pp.aberrations` at the normalized pupil radius `ρ` (0 ≤ ρ ≤ 1, with 1 being the pupil border)
+and the pupil azimuthal angle(s) `ψ` (a number or an array). The same convention as in `get_zernike_pupil_phase` is used.
+"""
+function get_zernike_phase_polar(pp, ρ, ψ)
+    J = pp.aberrations.indices
+    index_style = get_zernike_index_style(pp.aberrations.index_style)
+    res = zero.(ψ .* ρ)
+    for (j, coef) in zip(J, pp.aberrations.coefficients)
+        zfct = zernike(index_style(j); coord=:polar)
+        res = res .+ (coef / normalization(index_style(j))) .* zfct.(ρ, ψ)
+    end
+    return res
+end
+
+"""
     get_zernike_index_style(sym)
 
 returns OSA for the symbol :OSA and Noll for the symbol :Noll and an error otherwise

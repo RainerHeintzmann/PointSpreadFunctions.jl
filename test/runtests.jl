@@ -59,6 +59,22 @@ end
     compare_asfs(sz, pp, sampling; noRW=true)
 end
 
+@testset "Richards & Wolf with aberrations" begin
+    szab = (64,64,64)
+    aberr = Aberrations([Zernike_VerticalAstigmatism, Zernike_HorizontalComa, Zernike_Spherical], [0.5, 0.4, 0.6])
+    for pol in (pol_x, pol_y, pol_circ)
+        pp_rw = PSFParams(0.5, 1.2, 1.33; pol=pol, method=PointSpreadFunctions.MethodRichardsWolf, aberrations=aberr)
+        pp_it = PSFParams(pp_rw; method=PointSpreadFunctions.MethodPropagateIterative)
+        a_rw = apsf(szab, pp_rw, sampling=(0.05,0.05,0.15))
+        a_it = apsf(szab, pp_it, sampling=(0.05,0.05,0.15))
+        @test isapprox(abs2.(a_rw), abs2.(a_it), rtol=0.05, atol=0.05*maximum(abs2.(a_it)))
+    end
+    # zero aberrations need to reproduce the rotationally symmetric version
+    pp0 = PSFParams(0.5, 1.2, 1.33; pol=pol_x, method=PointSpreadFunctions.MethodRichardsWolf)
+    pp0a = PSFParams(pp0; aberrations=Aberrations([Zernike_Spherical],[0.0]))
+    @test apsf(szab, pp0, sampling=(0.05,0.05,0.15)) ≈ apsf(szab, pp0a, sampling=(0.05,0.05,0.15)) rtol=1e-4
+end
+
 ct = sz[1].÷2+1
 pb = 86
 @testset "vectorial pupil" begin

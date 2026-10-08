@@ -440,12 +440,137 @@ function simpson!(f,α,N=80)
     return I012
 end
 
+"""
+    apsf_RW_aberrated(sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false, N=300, Nψ=64, rel_tol=1e-4)
+
+Richards & Wolf amplitude point spread function including Zernike pupil aberrations (`pp.aberrations`).
+This is called by `apsf(MethodRichardsWolf, ...)` whenever aberrations are present.
+
+The aberration breaks the rotational symmetry of the pupil. The pupil function `G_c(θ,ψ) = exp(iΦ(θ,ψ)) v_c(θ,ψ)` of each field component `c` 
+(with the polarization vector `v_c` of the aplanatic system) is therefore expanded into an azimuthal Fourier series `G_c = Σ_m a_{c,m}(θ) cos(mψ) + b_{c,m}(θ) sin(mψ)` 
+by sampling `Nψ` azimuthal angles. The field is then 
+
+    E_c(ρ,φ,z) = Σ_m i^m [ cos(mφ) ∫ a_{c,m}(θ) J_m(kρ sinθ) e^{ikz cosθ} w(θ) sinθ dθ + sin(mφ) ∫ b_{c,m}(θ) ...  ]
+
+The radial integrals are evaluated (via Simpson's rule with `N` intervals) on an RZ plane as matrix products and are interpolated onto the 3D volume. 
+Only the Fourier orders (and cos/sin parts), which are larger than `rel_tol` relative to the largest coefficient are calculated.
+The unaberrated version is much faster, see `apsf(MethodRichardsWolf, ...)`.
+
+This extension of the Richards & Wolf method follows the approach of the `universal_psf` package by J. Enderlein 
+(https://gitlab.gwdg.de/ag_enderlein/universal_psf/), which is described in the bioRxiv preprint
+"https://www.biorxiv.org/content/10.64898/2026.04.28.721333v1" (doi: 10.64898/2026.04.28.721333).
+"""
+function apsf_RW_aberrated(sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false, N=300, Nψ=64, rel_tol=1e-4)
+    sz, sampling = size_sampling_to3d(sz, sampling)
+    sampling_r = min(sampling[1],sampling[2])/3
+    diagonal = sqrt(sum(abs2.(sz[1:2] .* sampling[1:2]))) / 2.0;
+    sr = ceil(Int64, diagonal/sampling_r) + 1
+    r = collect(Float64, xx((sr,), scale=sampling_r, offset=CtrCorner)) # radial positions
+    szz = sz[3]
+    k = 2pi / (pp.λ / pp.n)
+    zpos = ((1:szz) .- (szz÷2+1)) .* Float64(sampling[3])
+    α = asin(pp.NA / pp.n) # maximal aperture angle
+
+    # Simpson nodes and weights over θ
+    h = α / N
+    θs = collect(0:2N) .* (h/2)
+    swts = [(p==0 || p==2N) ? h/6 : (isodd(p) ? 4h/6 : 2h/6) for p in 0:2N]
+    cost, sint = cos.(θs), sin.(θs)
+    isscalar = pp.polarization == pol_scalar
+    # same aplanatic weighting as in the unaberrated version
+    waplanatic = isscalar ? pp.aplanatic.(θs) .* sqrt.(max.(cost, 0.0)) : pp.aplanatic.(θs) .* max.(cost, 0.0)
+    wts = swts .* waplanatic .* sint
+
+    # pupil functions G_c(θ,ψ) for all field components on a ψ grid
+    ψs = reshape((0:Nψ-1) .* (2π/Nψ), 1, :)
+    c, s = cost, sint
+    Φ = get_zernike_phase_polar(pp, reshape(sint ./ sin(α), :, 1), ψs)
+    eiΦ = cis.(Φ)
+    vxx = (1 .+ c) .+ (c .- 1) .* cos.(2 .* ψs); vyx = (c .- 1) .* sin.(2 .* ψs); vzx = 2 .* s .* cos.(ψs) # x polarized input
+    vxy = vyx; vyy = (1 .+ c) .- (c .- 1) .* cos.(2 .* ψs); vzy = 2 .* s .* sin.(ψs) # y polarized input
+    G = if pp.polarization == pol_x
+        [vxx, vyx, vzx]
+    elseif pp.polarization == pol_y
+        [vxy, vyy, vzy]
+    elseif pp.polarization == pol_circ
+        [(vxx .+ im .* vxy) ./ sqrt(2), (vyx .+ im .* vyy) ./ sqrt(2), (vzx .+ im .* vzy) ./ sqrt(2)]
+    elseif isscalar
+        [(1 .+ c) .* ones(1, Nψ)]
+    else
+        error("unsupported polarization for Richards-Wolf method")
+    end
+    numEl = length(G)
+    Ĝ = [fft(g .* eiΦ, 2) ./ Nψ for g in G] # complex Fourier coefficients along ψ
+    # cosine and sine coefficients: a_0, a_m = Ĝ_m + Ĝ_-m, b_m = i (Ĝ_m - Ĝ_-m)
+    Mmax = Nψ÷2 - 1
+    coefA = [[m==0 ? gh[:,1] : gh[:,m+1] .+ gh[:,Nψ-m+1] for m in 0:Mmax] for gh in Ĝ]
+    coefB = [[gh[:,m+1] .- gh[:,Nψ-m+1] for m in 1:Mmax] .* im for gh in Ĝ]
+    gmax = maximum(maximum(abs.(a)) for ca in coefA for a in ca)
+    thresh = rel_tol * gmax
+    mused = [m for m in 0:Mmax if any(maximum(abs.(coefA[ci][m+1])) > thresh || (m>0 && maximum(abs.(coefB[ci][m])) > thresh) for ci in 1:numEl)]
+    if !isempty(mused) && maximum(mused) >= Mmax
+        @warn "Richards-Wolf with aberrations: the azimuthal Fourier series is not converged. The aberrations may be too strong."
+    end
+
+    # radial-z tables for each field component, Fourier order and cos/sin part
+    ez = cis.(k .* cost * transpose(zpos)) # (Nθ × szz)
+    tables = Vector{Tuple{Int,Int,Bool,Matrix{ComplexF64}}}() # (component, m, is_sin, table (sr × szz))
+    for m in mused
+        Jm = nothing
+        for ci in 1:numEl, is_sin in (false, true)
+            (is_sin && m == 0) && continue
+            coef = is_sin ? coefB[ci][m] : coefA[ci][m+1]
+            maximum(abs.(coef)) > thresh || continue
+            isnothing(Jm) && (Jm = besselj.(m, (k .* r) * transpose(sint)))
+            T = Jm * ((wts .* coef) .* ez) .* (im^m)
+            push!(tables, (ci, m, is_sin, T))
+        end
+    end
+
+    # Interpolate the RZ-results onto the 3D grid
+    phi = phiphi((sz[1],sz[2]), scale=(sampling[1],sampling[2]))
+    trig = Dict{Tuple{Int,Bool},Matrix{Float64}}()
+    for (_, m, is_sin, _) in tables
+        haskey(trig, (m, is_sin)) || (trig[(m, is_sin)] = is_sin ? sin.(m .* phi) : cos.(m .* phi))
+    end
+    rpos = rr((sz[1],sz[2]), scale=(sampling[1],sampling[2]))
+    r_idx = 1 .+ floor.(Int64, rpos ./ sampling_r)
+    w = 1.0 .- (rpos./sampling_r .+ 1 .- r_idx)
+    L0 = (w.-1).*w./2; L1 = (2 .-w).*w; L2 = (2 .-w).*(1 .-w)./2 # Lagrange's quadratic interpolation
+    interp(vals) = L0 .*(@view vals[abs.(r_idx.-2).+1]) .+ L1 .*(@view vals[r_idx]) .+ L2 .*(@view vals[r_idx.+1])
+
+    E = zeros(Complex{pp.dtype}, (sz..., numEl))
+    _, rel_kz = get_McCutchen_kz_center((sz[1:2]..., szz),pp,sampling)
+    acc = zeros(ComplexF64, sz[1], sz[2], numEl)
+    for z = 1:szz
+        z_pos = z - (szz÷2+1)
+        rel_phase = center_kz ? cispi((-2*rel_kz/szz) * z_pos) : one(ComplexF64) # centers the McCutchen pupil along kz
+        fill!(acc, 0)
+        for (ci, m, is_sin, T) in tables
+            @views acc[:,:,ci] .+= interp(T[:,z]) .* trig[(m, is_sin)]
+        end
+        E[:,:,z,:] .= Complex{pp.dtype}.(rel_phase .* acc)
+    end
+    return normalize_amp_to_plane(E)
+end
+
 # Calculates I0, I1 and I2 according to the Richards and Wolf paper
 # The calculation is done on an RZ plane and then interpolated to a 3D volume.
 # This is probably still buggy! At least the Pupil aplanatic factor looks wrong!
+"""
+    apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false)
+
+Calculates the amplitude point spread function using the method of B. Richards and E. Wolf, "Electromagnetic diffraction in optical systems. II. Structure of the image field in an aplanatic system",
+Proc. R. Soc. London A 253, 358 (1959). The terms I0, I1 and I2 are calculated on an RZ plane (assuming rotational symmetry) and are then interpolated onto the 3D volume.
+
+If Zernike aberrations are present in `pp.aberrations`, the rotational symmetry is broken and the calculation is delegated to `apsf_RW_aberrated`, which expands the aberrated pupil into azimuthal Fourier orders.
+This extension follows the approach of the `universal_psf` package by J. Enderlein (https://gitlab.gwdg.de/ag_enderlein/universal_psf/), which is described in the bioRxiv preprint
+https://www.biorxiv.org/content/10.64898/2026.04.28.721333v1 (doi: 10.64898/2026.04.28.721333). 
+Supported polarizations are `pol_x`, `pol_y`, `pol_circ` and `pol_scalar`.
+"""
 function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=nothing, center_kz=false) 
-    if length(pp.aberrations.indices) > 0
-        error("The Richards & Wolf amplitude spread function calculations does currently not support aberrations. Please choose a different method.")
+    if length(pp.aberrations.indices) > 0 # aberrations break the rotational symmetry
+        return apsf_RW_aberrated(sz, pp; sampling=sampling, center_kz=center_kz)
     end
     sz, sampling = size_sampling_to3d(sz, sampling)
 
