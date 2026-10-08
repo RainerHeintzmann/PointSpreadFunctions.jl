@@ -59,6 +59,10 @@ function apsf(::Type{MethodCZT}, sz::NTuple, pp::PSFParams; sampling=nothing, ce
             _, pupils[:,:,n:n,:], zoomed_pupil_fwd, zoomed_pupil_bwd, propagator = zoomed_pupilProp(sz, pp, zoomed_pupil_fwd, zoomed_pupil_bwd, propagator, sampling, my_dist; center_kz=false) 
         end
     end
+    if center_kz # centers the McCutchen pupil along kz to be able to correctly resample the result. Phases are then not correct, but this does not matter for intensity PSFs.
+        _, rel_kz = get_McCutchen_kz_center((wz..., z_planes), pp, sampling)
+        pupils .*= cispi.((-2*rel_kz/z_planes) .* zz((1,1,z_planes)))
+    end
     return normalize_amp_to_plane(pupils) 
 end
 
