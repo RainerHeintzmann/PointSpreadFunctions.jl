@@ -55,7 +55,9 @@ By default, no Aberrations are defined.
 
 Arguments:
 + indices:  Vector of indices
-+ coefficients: Vector of corresponding coefficients
++ coefficients: Vector of corresponding coefficients. The coefficients are phases in radians (not waves), i.e. the pupil is multiplied by `cis(Σ c_j Z_j)`.
+    A coefficient of `2π*0.1` corresponds to 0.1 waves. Note that the Zernike polynomials are used un-normalized (as on Wikipedia, with the value 1 at the pupil border for radial terms),
+    so the coefficient is the peak (not the RMS) phase of the corresponding term.
 + index_style: type of indexing used. By defaul :OSA is used (See: https://en.wikipedia.org/wiki/Zernike_polynomials#OSA/ANSI_standard_indices)
 
 Here is a list of constants defining the main indices (OSA style):
@@ -68,7 +70,7 @@ Here is a list of constants defining the main indices (OSA style):
 `:Zernike_VerticalTrefoil` = 6
 `:Zernike_VerticalComa` = 7
 `:Zernike_HorizontalComa` = 8
-`:Zernike_ObliqueTrefoil` = 0
+`:Zernike_ObliqueTrefoil` = 9
 `:Zernike_ObliqueQuadrafoil` = 10
 `:Zernike_ObliqueSecondaryAstigmatism` = 11
 `:Zernike_Spherical` = 12

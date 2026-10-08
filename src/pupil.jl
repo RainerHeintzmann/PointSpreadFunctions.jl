@@ -158,6 +158,7 @@ end
 calculates the phases in the pupil for a given set of aberrations as defined by `J` and `coefficients`.
 By default this follows the OSA nomenclature. See the help file of `ZernikePolynomials.jl` for more information.
 The pupil phase (up to the pupil border as defined by the `NA` in `pp`) is returned.
+The coefficients (and thus the returned phase) are in radians, not waves: the pupil is `cis(phase)`. Use `2π*waves` to specify an aberration in waves.
 
 Arguments:
 + `sz`:  size of the real-space array
@@ -218,11 +219,17 @@ function get_zernike_pupil_phase(sz, pp, sampling)
     return reduce(+,map(*,D, mod_coeff))
 end
 
+"""
+    get_zernike_index_style(sym)
+
+returns OSA for the symbol :OSA and Noll for the symbol :Noll and an error otherwise
+
+"""
 function get_zernike_index_style(sym)
     if sym == :OSA
-        return Noll
-    elseif sym == :Noll
         return OSA
+    elseif sym == :Noll
+        return Noll
     else
         error("Unknown Zernike index style")
     end

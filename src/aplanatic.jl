@@ -9,18 +9,18 @@ limit_theta = (θ) -> eltype(θ).(θ .< pi/2)
 
 
 """
-    aplanatic_detection = (θ) -> sqrt.(max.(0,cos.(θ)))
+    aplanatic_detection = (θ) -> 1 ./ sqrt.(max.(0,cos.(θ)))
 
 This is the aplanatic factor typically used in detection of fluorescence of (randomly oriented) fluorophores. 
 """
 aplanatic_detection = (θ) ->  1 ./(sqrt.(max.(eps(eltype(θ)),cos.(θ))))  # returns only one "polarization" indicating that the whole calculation is to be performed scalar
 
 """
-    aplanatic_illumination = (θ) -> sqrt.(max.(0,cos.(θ)))
+    aplanatic_illumination = (θ) -> 1 ./ sqrt.(max.(0,cos.(θ)))
 
 This is the aplanatic factor typically used in illumination of (randomly oriented) fluorophores. Note that it is identical to detection.
 """
-aplanatic_illumination = (θ) -> sqrt.(max.(0,cos.(θ)))  # returns only one "polarization" indicating that the whole calculation is to be performed scalar
+aplanatic_illumination = aplanatic_detection # used to be (θ) -> sqrt.(max.(0,cos.(θ)))  # returns only one "polarization" indicating that the whole calculation is to be performed scalar
 
 """
     aplanatic_const = (θ) -> one.(eltype(θ))
