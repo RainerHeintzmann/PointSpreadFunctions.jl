@@ -177,9 +177,16 @@ function psf(::Type{ModeLightsheet}, sz::NTuple, pp_em::PSFParams; sampling=noth
     # check the sampling for the widefield emission PSF
     check_amp_sampling_xy(sz, pp_em, sampling)
 
-    # switch coordinates and sampling for the excitation PSF
-    sz_ex = (sz[3], sz[2], sz[3])
-    sampling_ex = (sampling[3], sampling[2], sampling[3])
+    # switch coordinates and sampling for the excitation PSF: the excitation's
+    # own optical axis (its dim 3) becomes the final X axis (dim 1) after the
+    # `permutedims(psf_ex, (3,2,1))` below, and its own dim 1 becomes the final
+    # Z axis (dim 3) — so sz_ex/sampling_ex must take their *ends* from sz[3]
+    # (final Z) and sz[1] (final X) respectively, not both from sz[3]. Getting
+    # this wrong only shows up as a `DimensionMismatch` in the final `.*` when
+    # the requested size/sampling is non-cubic (sz[1] != sz[3]), which is the
+    # normal case — a cubic request masks the bug.
+    sz_ex = (sz[3], sz[2], sz[1])
+    sampling_ex = (sampling[3], sampling[2], sampling[1])
 
     if isnothing(sigma_z)
         # check th z-sampling.   WRONG!!!:
