@@ -128,6 +128,22 @@ end
     @test p_lightsheet1[33,33,33] > p_lightsheet2[33,33,33]
     @test p_lightsheetg[33,33,33] > p_lightsheet1[33,33,33]
     @test p_lightsheetg[33,33,33] > p_lightsheetg[33,33,30]
+
+    # non-cubic size and sampling, coarse but Nyquist-sampled for the light-sheet PSF: the resampled
+    # and the direct calculation agree with detection × excitation computed without any resampling
+    nrm(h) = h ./ sum(h)
+    relerr(a, b) = sqrt(sum(abs2, nrm(a) .- nrm(b)) / sum(abs2, nrm(b)))
+    sz2, s2 = (64, 48, 32), (0.08, 0.08, 0.25)
+    pp_em2 = PSFParams(0.58, 1.1, 1.33; mode=ModeLightsheet)
+    w = dropdims(sum(abs2, apsf(sz2, PSFParams(pp_em2; mode=ModeWidefield); sampling=s2); dims=4); dims=4)
+    ex = dropdims(sum(abs2, apsf((sz2[3], 1, sz2[1]), pp_ex; sampling=(s2[3], s2[2], s2[1])); dims=4); dims=4)
+    ref = w .* permutedims(ex, (3, 2, 1))
+    @test relerr(psf(sz2, pp_em2; pp_ex=pp_ex, sampling=s2), ref) < 0.02
+    @test relerr(psf(sz2, pp_em2; pp_ex=pp_ex, sampling=s2, use_resampling=false), ref) < 1e-5
+    # the Gaussian sheet multiplies the widefield PSF
+    z = ((1:sz2[3]) .- (sz2[3] ÷ 2 + 1)) .* s2[3]
+    @test psf(sz2, pp_em2; sampling=s2, sigma_z=0.6) ≈
+          psf(ModeWidefield, sz2, pp_em2; sampling=s2) .* reshape(exp.(-z .^ 2 ./ (2 * 0.6^2)), 1, 1, :)
 end
 
 @testset "ISM PSF" begin

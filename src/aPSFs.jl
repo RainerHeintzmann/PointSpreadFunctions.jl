@@ -469,7 +469,7 @@ function apsf_RW_aberrated(sz::NTuple, pp::PSFParams; sampling=nothing, center_k
     sz, sampling = size_sampling_to3d(sz, sampling)
     sampling_r = min(sampling[1],sampling[2])/3
     diagonal = sqrt(sum(abs2.(sz[1:2] .* sampling[1:2]))) / 2.0;
-    sr = ceil(Int64, diagonal/sampling_r) + 1
+    sr = ceil(Int64, diagonal/sampling_r) + 2   # +2: the interpolation reads up to r_idx + 1 (see apsf(MethodRichardsWolf))
     r = collect(Float64, xx((sr,), scale=sampling_r, offset=CtrCorner)) # radial positions
     szz = sz[3]
     k = 2pi / (pp.λ / pp.n)
@@ -582,7 +582,9 @@ function apsf(::Type{MethodRichardsWolf}, sz::NTuple, pp::PSFParams; sampling=no
 
     sampling_r = min(sampling[1],sampling[2])/3
     diagonal = sqrt(sum(abs2.(sz[1:2] .* sampling[1:2]))) / 2.0;
-    sr = ceil(Int64, diagonal/sampling_r) + 1
+    # +2: the corner pixel has r_idx = 1 + floor(diagonal/sampling_r), and the interpolation also reads
+    # r_idx + 1 (with +1 a BoundsError whenever diagonal/sampling_r is an integer, e.g. 64×48 at 0.08)
+    sr = ceil(Int64, diagonal/sampling_r) + 2
     # @show sr
     r = xx((sr,), scale=sampling_r, offset=CtrCorner) # a generator for radius
     k = 2pi / (pp.λ / pp.n);

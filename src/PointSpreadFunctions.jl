@@ -218,12 +218,12 @@ function psf(::Type{ModeLightsheet}, sz::NTuple, pp_em::PSFParams; sampling=noth
                     sz_ex = (sz_ex[1], 1, sz_ex[3])
                 end
 
-                if use_resampling
-                    fct_ex = (sz,my_sampling) -> psf(ModeWidefield, sz, pp_ex; sampling=my_sampling, use_resampling=use_resampling)
-                    calc_with_resampling(fct_ex, sz_ex, sampling_ex, norm_amp=false)
-                else
-                    psf(ModeWidefield, sz_ex, pp_ex; sampling=sampling, use_resampling=use_resampling)
-                end
+                # The widefield PSF already resamples its amplitude (if `use_resampling`). Unlike
+                # in the confocal case, no second resampling level is wanted: the sheet only
+                # multiplies along Z, so the final grid needs to sample just the widefield
+                # intensities, not a product of two PSFs. (An outer `calc_with_resampling` would
+                # require twice finer sampling and aliases otherwise.)
+                psf(ModeWidefield, sz_ex, pp_ex; sampling=sampling_ex, use_resampling=use_resampling)
             end
             psf_ex = permutedims(psf_ex, (3,2,1))
             if (dynamically_scanned)
@@ -239,15 +239,8 @@ function psf(::Type{ModeLightsheet}, sz::NTuple, pp_em::PSFParams; sampling=noth
     # apply the two-photon effect for excitation if needed.
     psf_ex =  ex_modifier(psf_ex) 
 
-    # pp_em = PSFParams(pp, mode = ModeWidefield)
-    psf_em = let
-        if use_resampling
-            fct_em = (sz,my_sampling) -> psf(ModeWidefield, sz,pp_em; sampling=my_sampling, use_resampling=use_resampling)
-            calc_with_resampling(fct_em, sz, sampling, norm_amp=false)
-        else
-            psf(ModeWidefield, sz, pp_em; sampling=sampling, use_resampling=use_resampling)
-        end
-    end
+    # detection: an ordinary widefield PSF (single resampling level, see the excitation above)
+    psf_em = psf(ModeWidefield, sz, pp_em; sampling=sampling, use_resampling=use_resampling)
 
     res = psf_ex .* psf_em
     if length(sz)<3
