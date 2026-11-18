@@ -1,4 +1,5 @@
 using Test
+using FFTW   # the FFT library for the tests (the package itself only uses AbstractFFTs)
 
 using PointSpreadFunctions
 using NDTools

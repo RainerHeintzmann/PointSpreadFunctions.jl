@@ -1,6 +1,7 @@
 module PointSpreadFunctions
 using FourierTools: center_pos, FourierJoin
-using FourierTools, NDTools, IndexFunArrays, SpecialFunctions, FFTW
+# FFT interface only; the FFT library (FFTW, FFTL, cuFFT, ...) is loaded by the application.
+using FourierTools, NDTools, IndexFunArrays, SpecialFunctions, AbstractFFTs
 using ZernikePolynomials
 # using View5D # for debugging only!
 
